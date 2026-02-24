@@ -1,0 +1,70 @@
+{
+  "name": "ai-studio",
+  "version": "1.0.0",
+  "description": "AI Studio — Desktop AI Image Automation Tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "backend": "cd backend && python -m uvicorn main:app --host 127.0.0.1 --port 8001 --reload",
+    "build:backend": "python build_backend.py",
+    "build:electron": "electron-builder --win",
+    "build": "npm run build:backend && npm run build:electron"
+  },
+  "keywords": [
+    "ai",
+    "image-generation",
+    "electron",
+    "desktop"
+  ],
+  "author": "AI Studio",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/packager": "^19.0.5",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.ai-studio.app",
+    "productName": "AI Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "icon.png",
+      "uninstallerIcon": "icon.png"
+    }
+  }
+}

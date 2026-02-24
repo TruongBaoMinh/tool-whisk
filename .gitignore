@@ -1,0 +1,35 @@
+node_modules/
+dist/
+out/
+release/
+build/
+
+# Python
+backend/__pycache__/
+backend/data/
+backend/*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+backend_test_stdout.log
+backend_test_stderr.log
+build_log.txt
+
+# Output
+*.zip
+
+# Misc
+{}
