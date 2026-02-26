@@ -138,6 +138,53 @@ async def api_analyze_script(req: ScriptAnalyzeRequest):
     )
 
 
+@app.post("/analyze-script-regex", response_model=ScriptAnalyzeResponse)
+async def api_analyze_script_regex(req: ScriptAnalyzeRequest):
+    """Analyze script text using deterministic regex splitting (no Gemini required)."""
+    from scene_analyzer import analyze_script_by_regex
+
+    script_id = req.script_id
+    word_count = len(req.script_text.split())
+
+    # Save script content
+    await save_script(script_id, req.script_text, word_count)
+
+    # Clear existing scenes
+    await delete_scenes_for_script(script_id)
+
+    parsed_dicts = analyze_script_by_regex(req.script_text)
+
+    if not parsed_dicts:
+        raise HTTPException(status_code=400, detail="No scenes could be parsed from the script.")
+
+    # Persist scenes
+    scene_list: list[SceneData] = []
+    for ps in parsed_dicts:
+        sid = await insert_scene(
+            script_id=script_id,
+            scene_number=ps["scene_number"],
+            ts_start=ps["timestamp_start"],
+            ts_end=ps["timestamp_end"],
+            raw_text=ps["raw_text"],
+            prompt=ps["prompt"],
+        )
+        scene_list.append(SceneData(
+            id=sid,
+            scene_number=ps["scene_number"],
+            timestamp_start=ps["timestamp_start"],
+            timestamp_end=ps["timestamp_end"],
+            raw_text=ps["raw_text"],
+            prompt=ps["prompt"],
+            status="pending",
+        ))
+
+    return ScriptAnalyzeResponse(
+        script_id=script_id,
+        total_scenes=len(scene_list),
+        scenes=scene_list,
+    )
+
+
 @app.get("/scenes/{script_id}")
 async def api_get_scenes(script_id: int):
     """Get all scenes for a script."""

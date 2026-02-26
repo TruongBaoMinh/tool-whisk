@@ -33,6 +33,7 @@
         scenesList:    $('#scenes-list'),
         galleryGrid:   $('#gallery-grid'),
         btnAnalyze:    $('#btn-analyze'),
+        btnAnalyzeRegex: $('#btn-analyze-regex'),
         btnGenerateAll:$('#btn-generate-all'),
         btnExportZip:  $('#btn-export-zip'),
         btnRefreshAll: $('#btn-refresh-all'),
@@ -61,6 +62,7 @@
     function bindEvents() {
         els.editor.addEventListener('input', updateWordCount);
         els.btnAnalyze.addEventListener('click', analyzeScript);
+        els.btnAnalyzeRegex.addEventListener('click', analyzeScriptRegex);
         els.btnGenerateAll.addEventListener('click', generateAllImages);
         els.btnExportZip.addEventListener('click', exportZip);
         els.btnRefreshAll.addEventListener('click', refreshAll);
@@ -156,6 +158,45 @@
         }
     }
 
+    async function analyzeScriptRegex() {
+        const text = els.editor.value.trim();
+        if (!text) {
+            showToast('Please enter a script to analyze.', 'error');
+            return;
+        }
+
+        els.btnAnalyzeRegex.disabled = true;
+        els.btnAnalyzeRegex.innerHTML = `
+            <svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+            Splitting...
+        `;
+
+        try {
+            const result = await window.api.analyzeScriptRegex(text, state.scriptId, state.geminiApiKey);
+            state.scenes = result.scenes;
+            renderScenes();
+            addLogEntry('success', 'System', `Regex analyzed script: ${result.total_scenes} scenes found.`);
+            showToast(`Found ${result.total_scenes} scenes by regex.`, 'success');
+        } catch (err) {
+            addLogEntry('error', 'System', `Regex script analysis failed: ${err.message}`);
+            showToast(`Regex analysis failed: ${err.message}`, 'error');
+        } finally {
+            els.btnAnalyzeRegex.disabled = false;
+            els.btnAnalyzeRegex.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+                    <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+                    <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+                    <line x1="12" y1="22.08" x2="12" y2="16.8"/>
+                </svg>
+                Script by Regex
+            `;
+        }
+    }
+
     // ==================== Load Existing ====================
     async function loadExistingScenes() {
         try {
@@ -175,7 +216,7 @@
         if (!state.scenes.length) {
             els.scenesList.innerHTML = `
                 <div class="scenes-empty">
-                    <p>Click <strong>"Analyze Script"</strong> to split your script into scenes.</p>
+                    <p>Click <strong>"Analyze Script"</strong> or <strong>"Script by Regex"</strong> to split your script into scenes.</p>
                 </div>
             `;
             return;

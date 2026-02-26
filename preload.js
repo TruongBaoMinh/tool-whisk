@@ -51,6 +51,24 @@ contextBridge.exposeInMainWorld('api', {
     },
 
     /**
+     * Analyze script text with deterministic regex splitting.
+     * @param {string} scriptText
+     * @param {number} scriptId
+     * @param {string} geminiApiKey - kept for payload compatibility, ignored by backend regex flow
+     */
+    analyzeScriptRegex: async (scriptText, scriptId = 1, geminiApiKey = '') => {
+        const res = await apiFetch('/analyze-script-regex', {
+            method: 'POST',
+            body: JSON.stringify({
+                script_text: scriptText,
+                script_id: scriptId,
+                gemini_api_key: geminiApiKey,
+            }),
+        });
+        return res.json();
+    },
+
+    /**
      * Get scenes for a script
      */
     getScenes: async (scriptId = 1) => {
