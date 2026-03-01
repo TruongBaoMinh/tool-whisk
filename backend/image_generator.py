@@ -10,7 +10,6 @@ for higher parallelism.
 import asyncio
 import base64
 import json
-import logging
 import random
 import uuid
 from pathlib import Path
@@ -20,17 +19,6 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import get_config
 import database as db
-
-# Setup logger
-logger = logging.getLogger("image_generator")
-logger.setLevel(logging.DEBUG)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S"
-    ))
-    logger.addHandler(handler)
 
 # Number of workers to spawn per access token
 WORKERS_PER_TOKEN = 3
@@ -57,11 +45,10 @@ class ImageGenerationQueue:
         for i in range(num_workers):
             task = asyncio.create_task(self._worker(f"worker-{i}", token=""))
             self._workers.append(task)
-        logger.info(f"Started {num_workers} fallback workers (no tokens)")
+        print(f"[Queue] Started {num_workers} fallback workers (no tokens)")
 
     async def stop(self):
         """Gracefully stop all workers."""
-        logger.debug(f"Stopping {len(self._workers)} workers...")
         self._running = False
         # Drain the queue
         while not self._queue.empty():
@@ -83,7 +70,6 @@ class ImageGenerationQueue:
         """
         # Only restart if the token set has actually changed
         if set(tokens) == set(self._tokens) and self._workers:
-            logger.debug(f"Token set unchanged ({len(tokens)} tokens), skipping restart")
             return
 
         await self.stop()
@@ -98,12 +84,12 @@ class ImageGenerationQueue:
                     task = asyncio.create_task(self._worker(name, token=token))
                     self._workers.append(task)
             total = len(tokens) * WORKERS_PER_TOKEN
-            logger.info(f"Started {total} workers ({len(tokens)} tokens × {WORKERS_PER_TOKEN} workers each)")
+            print(f"[Queue] Started {total} workers ({len(tokens)} tokens × {WORKERS_PER_TOKEN} workers each)")
         else:
             for i in range(WORKERS_PER_TOKEN):
                 task = asyncio.create_task(self._worker(f"worker-{i}", token=""))
                 self._workers.append(task)
-            logger.info(f"Started {WORKERS_PER_TOKEN} fallback workers (no tokens)")
+            print(f"[Queue] Started {WORKERS_PER_TOKEN} fallback workers (no tokens)")
 
     def get_next_token(self) -> str:
         """Get the next token via round-robin (used for single regeneration)."""
@@ -115,13 +101,11 @@ class ImageGenerationQueue:
 
     async def enqueue(self, scene_id: int, prompt: str, scene_number: int):
         """Add an image generation job to the queue."""
-        logger.debug(f"Enqueue scene_id={scene_id}, scene_number={scene_number}, prompt_len={len(prompt)}, queue_size={self._queue.qsize()}")
         await self._queue.put({
             "scene_id": scene_id,
             "prompt": prompt,
             "scene_number": scene_number,
         })
-        logger.debug(f"Queue size after enqueue: {self._queue.qsize()}")
 
     @property
     def pending_count(self) -> int:
@@ -137,40 +121,30 @@ class ImageGenerationQueue:
 
     async def _worker(self, name: str, token: str):
         """Process jobs from the queue using the assigned token."""
-        logger.info(f"[{name}] Worker started (token: {'...' + token[-6:] if token else 'NONE'})")
         while self._running:
             try:
                 job = await asyncio.wait_for(self._queue.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
-                logger.info(f"[{name}] Worker cancelled")
                 break
 
             scene_id = job["scene_id"]
             prompt = job["prompt"] if isinstance(job["prompt"], str) else ""
             scene_number = job["scene_number"]
-            import time
-            start_time = time.time()
 
             if not prompt.strip():
-                logger.warning(f"[{name}] Scene {scene_id} has empty prompt, skipping")
-                try:
-                    await db.update_scene_error(scene_id, "Prompt is empty. Please edit the prompt and regenerate.")
-                except Exception as db_err:
-                    logger.error(f"[{name}] DB error while saving empty prompt error: {db_err}")
+                print(f"[{name}] ✗ Scene {scene_id} has empty prompt, skipping")
+                await db.update_scene_error(scene_id, "Prompt is empty. Please edit the prompt and regenerate.")
                 self._queue.task_done()
                 continue
 
             try:
-                logger.info(f"[{name}] ▶ Processing scene {scene_id} (scene #{scene_number})")
-                logger.debug(f"[{name}] Prompt: {prompt[:100]}..." if len(prompt) > 100 else f"[{name}] Prompt: {prompt}")
+                print(f"[{name}] Processing scene {scene_id} (scene #{scene_number})")
                 await db.update_scene_status(scene_id, "generating")
 
                 # Delete old images for this scene (so regenerate replaces)
                 old_paths = await db.delete_images_for_scene(scene_id)
-                if old_paths:
-                    logger.debug(f"[{name}] Deleted {len(old_paths)} old image(s) for scene {scene_id}")
                 for old_path in old_paths:
                     try:
                         Path(old_path).unlink(missing_ok=True)
@@ -179,13 +153,11 @@ class ImageGenerationQueue:
 
                 if token:
                     # Call real Whisk API with the assigned token
-                    logger.debug(f"[{name}] Using Whisk API (token: ...{token[-6:]})")
                     file_path, file_name, width, height = await self._generate_with_whisk(
                         prompt, scene_number, token
                     )
                 else:
                     # Fallback to placeholder
-                    logger.debug(f"[{name}] No token, generating placeholder")
                     file_path, file_name = await self._generate_placeholder(
                         prompt, scene_number
                     )
@@ -201,23 +173,14 @@ class ImageGenerationQueue:
                     height=height,
                 )
                 await db.update_scene_status(scene_id, "success")
-                elapsed = time.time() - start_time
-                logger.info(f"[{name}] ✓ Scene {scene_id} completed → {file_name} ({width}x{height}) [{elapsed:.1f}s]")
+                print(f"[{name}] ✓ Scene {scene_id} completed")
 
             except Exception as e:
-                elapsed = time.time() - start_time
                 err_msg = str(e)[:500]
-                logger.error(f"[{name}] ✗ Scene {scene_id} FAILED after {elapsed:.1f}s: {e}", exc_info=True)
-                try:
-                    await db.update_scene_error(scene_id, err_msg)
-                    logger.debug(f"[{name}] Scene {scene_id} status set to 'error' in DB")
-                except Exception as db_err:
-                    logger.error(f"[{name}] CRITICAL: Could not save error to DB for scene {scene_id}: {db_err}")
+                print(f"[{name}] ✗ Error generating image for scene {scene_id}: {e}")
+                await db.update_scene_error(scene_id, err_msg)
             finally:
                 self._queue.task_done()
-                logger.debug(f"[{name}] ◼ Job done for scene {scene_id}, queue remaining: {self._queue.qsize()}")
-
-        logger.info(f"[{name}] Worker stopped")
 
     async def _generate_with_whisk(self, prompt: str, scene_number: int, token: str) -> tuple[str, str, int, int]:
         """
@@ -252,54 +215,30 @@ class ImageGenerationQueue:
             "mediaCategory": "MEDIA_CATEGORY_BOARD"
         }
 
-        logger.debug(f"Whisk API request: seed={payload['seed']}, prompt_len={len(payload['prompt'])}")
-        logger.info(f"Whisk API → Calling POST {self.WHISK_API_URL}...")
-
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    self.WHISK_API_URL,
-                    headers=headers,
-                    content=json.dumps(payload),
-                )
-        except httpx.TimeoutException as e:
-            logger.error(f"Whisk API TIMEOUT after 120s: {e}")
-            raise Exception(f"Whisk API timeout after 120s: {e}")
-        except httpx.RequestError as e:
-            logger.error(f"Whisk API CONNECTION ERROR: {e}")
-            raise Exception(f"Whisk API connection error: {e}")
-
-        logger.info(f"Whisk API ← Response: status={response.status_code}, size={len(response.content)} bytes")
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                self.WHISK_API_URL,
+                headers=headers,
+                content=json.dumps(payload),
+            )
 
         if response.status_code != 200:
-            # Log toàn bộ response body để debug
-            logger.error(f"═══ WHISK API FAILED ═══")
-            logger.error(f"Status code: {response.status_code}")
-            logger.error(f"Response headers: {dict(response.headers)}")
-            logger.error(f"Response body (full): {response.text[:2000]}")
-            logger.error(f"════════════════════════")
             raise Exception(f"Whisk API failed ({response.status_code}): {response.text[:500]}")
 
         data = response.json()
-        logger.debug(f"Whisk API response keys: {list(data.keys())}")
 
         # Parse the response: extract the first generated image
         image_panels = data.get("imagePanels", [])
         if not image_panels:
-            logger.error(f"Whisk API response has no imagePanels. Full response: {json.dumps(data)[:1000]}")
             raise Exception("Whisk API returned no imagePanels")
 
         generated_images = image_panels[0].get("generatedImages", [])
         if not generated_images:
-            logger.error(f"Whisk API imagePanels[0] has no generatedImages. Panel: {json.dumps(image_panels[0])[:500]}")
             raise Exception("Whisk API returned no generatedImages")
 
         encoded_image = generated_images[0].get("encodedImage")
         if not encoded_image:
-            logger.error(f"Whisk API generatedImages[0] has no encodedImage. Keys: {list(generated_images[0].keys())}")
             raise Exception("Whisk API returned no encodedImage data")
-
-        logger.debug(f"Whisk API image decoded OK, base64 length: {len(encoded_image)}")
 
         # Decode base64 image and save to disk
         image_bytes = base64.b64decode(encoded_image)

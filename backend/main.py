@@ -25,7 +25,10 @@ from models import (
     ScriptAnalyzeRequest, ScriptAnalyzeResponse, SceneData,
     GenerateImagesRequest, RegenerateRequest, UpdatePromptRequest,
     GenerationStatus, ImageData, ExportResponse,
+    GenerateAudioPromptRequest, GenerateAudioPromptResponse,
 )
+from scene_analyzer import analyze_script
+from prompt import generate_single_audio_prompt
 from image_generator import get_queue
 
 
@@ -82,10 +85,7 @@ async def api_list_projects():
 
 @app.post("/analyze-script", response_model=ScriptAnalyzeResponse)
 async def api_analyze_script(req: ScriptAnalyzeRequest):
-    """Analyze script text using Gemini AI and split into scenes with generated prompts."""
-    import logging
-    logger = logging.getLogger(__name__)
-
+    """Analyze script text and split into scenes with generated prompts."""
     script_id = req.script_id
     word_count = len(req.script_text.split())
 
@@ -95,39 +95,35 @@ async def api_analyze_script(req: ScriptAnalyzeRequest):
     # Clear existing scenes
     await delete_scenes_for_script(script_id)
 
-    # Call Gemini API for scene analysis
-    from prompt import analyze_script_with_gemini
-
+    # Parse scenes
     try:
-        parsed_dicts = await analyze_script_with_gemini(req.script_text, req.gemini_api_key)
-    except ValueError as e:
-        logger.error(f"Gemini API key error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        logger.error(f"Gemini API error: {e}")
+        parsed = analyze_script(req.script_text, api_key=req.gemini_api_key)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
-    if not parsed_dicts:
+    if not parsed:
         raise HTTPException(status_code=400, detail="No scenes could be parsed from the script.")
 
     # Persist scenes
     scene_list: list[SceneData] = []
-    for ps in parsed_dicts:
+    for ps in parsed:
         sid = await insert_scene(
             script_id=script_id,
-            scene_number=ps["scene_number"],
-            ts_start=ps["timestamp_start"],
-            ts_end=ps["timestamp_end"],
-            raw_text=ps["raw_text"],
-            prompt=ps["prompt"],
+            scene_number=ps.scene_number,
+            ts_start=ps.timestamp_start,
+            ts_end=ps.timestamp_end,
+            raw_text=ps.raw_text,
+            prompt=ps.prompt,
         )
         scene_list.append(SceneData(
             id=sid,
-            scene_number=ps["scene_number"],
-            timestamp_start=ps["timestamp_start"],
-            timestamp_end=ps["timestamp_end"],
-            raw_text=ps["raw_text"],
-            prompt=ps["prompt"],
+            scene_number=ps.scene_number,
+            timestamp_start=ps.timestamp_start,
+            timestamp_end=ps.timestamp_end,
+            raw_text=ps.raw_text,
+            prompt=ps.prompt,
             status="pending",
         ))
 
@@ -138,51 +134,22 @@ async def api_analyze_script(req: ScriptAnalyzeRequest):
     )
 
 
-@app.post("/analyze-script-regex", response_model=ScriptAnalyzeResponse)
-async def api_analyze_script_regex(req: ScriptAnalyzeRequest):
-    """Analyze script text using deterministic regex splitting (no Gemini required)."""
-    from scene_analyzer import analyze_script_by_regex
-
-    script_id = req.script_id
-    word_count = len(req.script_text.split())
-
-    # Save script content
-    await save_script(script_id, req.script_text, word_count)
-
-    # Clear existing scenes
-    await delete_scenes_for_script(script_id)
-
-    parsed_dicts = analyze_script_by_regex(req.script_text)
-
-    if not parsed_dicts:
-        raise HTTPException(status_code=400, detail="No scenes could be parsed from the script.")
-
-    # Persist scenes
-    scene_list: list[SceneData] = []
-    for ps in parsed_dicts:
-        sid = await insert_scene(
-            script_id=script_id,
-            scene_number=ps["scene_number"],
-            ts_start=ps["timestamp_start"],
-            ts_end=ps["timestamp_end"],
-            raw_text=ps["raw_text"],
-            prompt=ps["prompt"],
+@app.post("/generate-audio-prompt", response_model=GenerateAudioPromptResponse)
+async def api_generate_audio_prompt(req: GenerateAudioPromptRequest):
+    """Generate a single image prompt for an audio-synced sequence."""
+    try:
+        prompt_text = await generate_single_audio_prompt(
+            script_text=req.script_text,
+            prompt_index=req.prompt_index,
+            total_prompts=req.total_prompts,
+            visual_style=req.visual_style,
+            api_key=req.gemini_api_key
         )
-        scene_list.append(SceneData(
-            id=sid,
-            scene_number=ps["scene_number"],
-            timestamp_start=ps["timestamp_start"],
-            timestamp_end=ps["timestamp_end"],
-            raw_text=ps["raw_text"],
-            prompt=ps["prompt"],
-            status="pending",
-        ))
-
-    return ScriptAnalyzeResponse(
-        script_id=script_id,
-        total_scenes=len(scene_list),
-        scenes=scene_list,
-    )
+        return GenerateAudioPromptResponse(prompt=prompt_text)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/scenes/{script_id}")
@@ -355,15 +322,5 @@ async def api_export_zip(script_id: int = 1):
 # ---------- Run directly ----------
 
 if __name__ == "__main__":
-    import sys
     import uvicorn
-
-    # When run as PyInstaller exe, reload is not supported
-    is_frozen = getattr(sys, 'frozen', False)
-    uvicorn.run(
-        app,  # Use app object directly (required for PyInstaller)
-        host=cfg.host,
-        port=cfg.port,
-        reload=not is_frozen,
-        log_level="info" if is_frozen else "debug",
-    )
+    uvicorn.run("main:app", host=cfg.host, port=cfg.port, reload=True)

@@ -13,6 +13,14 @@ class ScriptAnalyzeRequest(BaseModel):
     gemini_api_key: str = Field(default="", description="Gemini API key for AI-powered scene analysis")
 
 
+class GenerateAudioPromptRequest(BaseModel):
+    script_text: str = Field(..., min_length=1, description="Raw script text")
+    prompt_index: int = Field(..., ge=1, description="Index of prompt to generate")
+    total_prompts: int = Field(..., ge=1, description="Total number of prompts in sequence")
+    visual_style: str = Field(default="", description="Optional custom visual style")
+    gemini_api_key: str = Field(..., min_length=1, description="Gemini API key")
+
+
 class GenerateImagesRequest(BaseModel):
     script_id: int = Field(default=1, description="Script whose scenes to generate")
     access_token: list[str] = Field(default=[], description="List of Google access tokens for Whisk API")
@@ -45,6 +53,10 @@ class ScriptAnalyzeResponse(BaseModel):
     script_id: int
     total_scenes: int
     scenes: list[SceneData]
+
+
+class GenerateAudioPromptResponse(BaseModel):
+    prompt: str
 
 
 class ImageData(BaseModel):

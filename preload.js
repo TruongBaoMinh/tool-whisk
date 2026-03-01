@@ -51,6 +51,23 @@ contextBridge.exposeInMainWorld('api', {
     },
 
     /**
+     * Generate a single image prompt for an audio-synced sequence
+     */
+    generateAudioPrompt: async (scriptText, promptIndex, totalPrompts, visualStyle, geminiApiKey) => {
+        const res = await apiFetch('/generate-audio-prompt', {
+            method: 'POST',
+            body: JSON.stringify({
+                script_text: scriptText,
+                prompt_index: promptIndex,
+                total_prompts: totalPrompts,
+                visual_style: visualStyle,
+                gemini_api_key: geminiApiKey,
+            }),
+        });
+        return res.json();
+    },
+
+    /**
      * Analyze script text with deterministic regex splitting.
      * @param {string} scriptText
      * @param {number} scriptId

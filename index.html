@@ -61,6 +61,14 @@
                         </svg>
                         <span>Export</span>
                     </a>
+                    <div style="height: 1px; background: var(--border-subtle); margin: 8px 12px;"></div>
+                    <a href="#" class="nav-item" data-section="autoprompt">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        <span>Auto Prompter</span>
+                    </a>
                 </nav>
             </div>
 
@@ -80,7 +88,7 @@
         </aside>
 
         <!-- ========== MAIN CONTENT ========== -->
-        <main class="main-content">
+        <main class="main-content" id="view-main">
 
             <!-- Header bar -->
             <header class="main-header">
@@ -94,12 +102,14 @@
                 <div class="header-actions">
                     <div class="gemini-key-group">
                         <label class="gemini-key-label" for="gemini-api-key">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
                             </svg>
                             Gemini API Key
                         </label>
-                        <input type="password" id="gemini-api-key" class="gemini-key-input"
+                        <input type="text" id="gemini-api-key" class="gemini-key-input"
                             placeholder="Enter Gemini API key..." spellcheck="false">
                     </div>
                     <button class="btn btn-secondary" id="btn-token-pool">
@@ -120,7 +130,8 @@
                     <button class="btn btn-secondary" id="btn-analyze-regex">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                             <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
                             <polyline points="7.5 19.79 7.5 14.6 3 12" />
                             <polyline points="21 12 16.5 14.6 16.5 19.79" />
@@ -163,7 +174,8 @@ The scientist looks into the microscope...</textarea>
                     <div class="scenes-list" id="scenes-list">
                         <!-- Scene cards rendered dynamically -->
                         <div class="scenes-empty">
-                            <p>Click <strong>"Analyze Script"</strong> or <strong>"Script by Regex"</strong> to split your script into scenes.</p>
+                            <p>Click <strong>"Analyze Script"</strong> or <strong>"Script by Regex"</strong> to split
+                                your script into scenes.</p>
                         </div>
                     </div>
                 </section>
@@ -183,6 +195,113 @@ The scientist looks into the microscope...</textarea>
                     <!-- Images rendered dynamically -->
                 </div>
             </section>
+        </main>
+
+        <!-- ========== AUTO PROMPTER CONTENT ========== -->
+        <main class="main-content" id="view-autoprompt" style="display: none;">
+            <header class="main-header">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">Tools</span>
+                    <span class="breadcrumb-sep">›</span>
+                    <span class="breadcrumb-item current">Auto Prompter</span>
+                </div>
+            </header>
+            <div class="panels-container">
+                <!-- LEFT: Inputs -->
+                <section class="panel-editor"
+                    style="flex: 0 0 400px; max-width: 400px; display: flex; flex-direction: column;">
+                    <div class="panel-header">
+                        <h2 class="panel-title">TẠO VISUAL PROMPTS TỰ ĐỘNG</h2>
+                    </div>
+                    <div class="editor-wrapper"
+                        style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+
+                        <div class="input-group">
+                            <label class="gemini-key-label" style="margin-bottom: 6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+                                </svg>
+                                Gemini API Key
+                            </label>
+                            <input type="text" id="ap-gemini-key" class="gemini-key-input" style="width: 100%;"
+                                placeholder="Enter Gemini API key...">
+                        </div>
+
+                        <div class="input-group" style="flex: 1; display: flex; flex-direction: column;">
+                            <label class="gemini-key-label" style="margin-bottom: 6px;">Kịch Bản (Script)</label>
+                            <textarea id="ap-script" class="script-textarea" style="flex: 1; min-height: 150px;"
+                                placeholder="Paste your script..."></textarea>
+                        </div>
+
+                        <div class="setup-group"
+                            style="background: var(--bg-card); padding: 12px; border: 1px solid var(--border-card); border-radius: var(--radius-sm);">
+                            <h3 class="panel-title" style="margin-bottom: 12px; color: #fff;">Cài Đặt</h3>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Thời lượng kịch bản
+                                    (giây):</label>
+                                <input type="number" id="ap-duration" value="650"
+                                    style="width: 80px; padding: 4px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Visual Pacing
+                                    (giây/prompt):</label>
+                                <input type="number" id="ap-pacing" value="10"
+                                    style="width: 80px; padding: 4px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                            <div
+                                style="text-align: center; padding: 8px; background: var(--bg-input); border-radius: 4px; font-size: 11px; color: var(--accent); font-weight: bold;">
+                                <span id="ap-stats">Số prompts: 65</span>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="gemini-key-label" style="margin-bottom: 6px;">Custom Visual Style</label>
+                            <textarea id="ap-style" class="script-textarea" style="min-height: 80px; font-size: 12px;"
+                                placeholder="complex shading, volumetric lighting, blur..."></textarea>
+                        </div>
+
+                        <div class="progress-container" style="display: none;" id="ap-progress-container">
+                            <div
+                                style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; font-weight: bold; color: var(--status-success);">
+                                <span id="ap-progress-text">Đang tạo...</span>
+                                <span id="ap-progress-pct">0%</span>
+                            </div>
+                            <div
+                                style="height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                <div id="ap-progress-bar"
+                                    style="height: 100%; width: 0%; background: var(--status-success); transition: width 0.3s ease;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="btn-ap-generate"
+                            style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; margin-top: auto;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                            </svg>
+                            Tạo Visual Prompts
+                        </button>
+                    </div>
+                </section>
+
+                <!-- RIGHT: Output -->
+                <section class="panel-editor" style="flex: 1;">
+                    <div class="panel-header">
+                        <h2 class="panel-title">SCRIPT SEGMENTS & VISUAL PROMPTS</h2>
+                        <button class="btn btn-text" id="btn-ap-clear">Clear All</button>
+                    </div>
+                    <div class="editor-wrapper" style="padding: 0; background: var(--bg-dark);">
+                        <textarea id="ap-output" class="script-textarea"
+                            style="border: none; border-radius: 0; min-height: 100%; font-family: monospace; font-size: 12px; white-space: pre-wrap; background: transparent; padding: 20px; line-height: 1.6;"
+                            readonly placeholder="Generated prompts will appear here..."></textarea>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 

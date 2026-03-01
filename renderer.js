@@ -47,6 +47,23 @@
         logPanel:      $('#log-panel'),
         logEntries:    $('#log-entries'),
         geminiKeyInput: $('#gemini-api-key'),
+
+        // Auto Prompter
+        apGeminiKey:   $('#ap-gemini-key'),
+        apScript:      $('#ap-script'),
+        apDuration:    $('#ap-duration'),
+        apPacing:      $('#ap-pacing'),
+        apStats:       $('#ap-stats'),
+        apStyle:       $('#ap-style'),
+        apOutput:      $('#ap-output'),
+        btnApGenerate: $('#btn-ap-generate'),
+        btnApClear:    $('#btn-ap-clear'),
+        apProgressContainer: $('#ap-progress-container'),
+        apProgressText: $('#ap-progress-text'),
+        apProgressPct:  $('#ap-progress-pct'),
+        apProgressBar:  $('#ap-progress-bar'),
+        viewMain:      $('#view-main'),
+        viewAutoPrompt:$('#view-autoprompt'),
     };
 
     // ==================== Init ====================
@@ -100,8 +117,31 @@
                 e.preventDefault();
                 $$('.nav-item').forEach((n) => n.classList.remove('active'));
                 item.classList.add('active');
+                
+                if (item.dataset.section === 'autoprompt') {
+                    if(els.viewMain) els.viewMain.style.display = 'none';
+                    if(els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'flex';
+                } else {
+                    if(els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'none';
+                    if(els.viewMain) els.viewMain.style.display = 'flex';
+                }
             });
         });
+
+        // Auto Prompter Calc
+        const calcApStats = () => {
+            if (!els.apDuration || !els.apPacing || !els.apStats) return;
+            const dur = parseFloat(els.apDuration.value) || 0;
+            const pacing = parseFloat(els.apPacing.value) || 1;
+            const prompts = Math.max(1, Math.ceil(dur / pacing));
+            els.apStats.textContent = `Số prompts: ${prompts}`;
+        };
+        if(els.apDuration) els.apDuration.addEventListener('input', calcApStats);
+        if(els.apPacing) els.apPacing.addEventListener('input', calcApStats);
+        
+        // Auto Prompter actions
+        if(els.btnApClear) els.btnApClear.addEventListener('click', () => { els.apOutput.value = ''; });
+        if(els.btnApGenerate) els.btnApGenerate.addEventListener('click', apGeneratePrompts);
     }
 
     // ==================== Word Count ====================
@@ -329,7 +369,8 @@
             const saved = localStorage.getItem('ai_studio_gemini_key');
             if (saved) {
                 state.geminiApiKey = saved;
-                els.geminiKeyInput.value = saved;
+                if(els.geminiKeyInput) els.geminiKeyInput.value = saved;
+                if(els.apGeminiKey) els.apGeminiKey.value = saved;
             }
         } catch (e) { /* ignore */ }
     }
@@ -810,6 +851,77 @@
         document.body.appendChild(toast);
 
         setTimeout(() => toast.remove(), 3500);
+    }
+
+    // ==================== Auto Prompter ====================
+    async function apGeneratePrompts() {
+        if (state.isGenerating) return;
+
+        const apiKey = els.apGeminiKey ? els.apGeminiKey.value.trim() : '';
+        if (!apiKey) {
+            showToast('Please enter your Gemini API key.', 'error');
+            return;
+        }
+        state.geminiApiKey = apiKey;
+        if(els.geminiKeyInput) els.geminiKeyInput.value = apiKey;
+        saveGeminiKey();
+
+        const scriptText = els.apScript ? els.apScript.value.trim() : '';
+        if (!scriptText) {
+            showToast('Please enter a script.', 'error');
+            return;
+        }
+
+        const dur = parseFloat(els.apDuration.value) || 0;
+        const pacing = parseFloat(els.apPacing.value) || 1;
+        const totalPrompts = Math.max(1, Math.ceil(dur / pacing));
+        const styleText = els.apStyle ? els.apStyle.value.trim() : '';
+
+        els.btnApGenerate.disabled = true;
+        els.btnApGenerate.innerHTML = `Đang xử lý...`;
+        
+        els.apProgressContainer.style.display = 'block';
+        els.apProgressBar.style.width = '0%';
+        els.apProgressBar.style.backgroundColor = 'var(--status-success)';
+        els.apProgressPct.textContent = '0%';
+        els.apProgressText.textContent = `0 / ${totalPrompts} prompts`;
+        
+        els.apOutput.value += `\n--- Bắt đầu phiên tạo mới (${totalPrompts} prompts) ---\n\n`;
+
+        state.isGenerating = true;
+
+        try {
+            for (let i = 1; i <= totalPrompts; i++) {
+                els.apProgressText.textContent = `Đang tạo prompt ${i}/${totalPrompts}...`;
+                
+                const response = await window.api.generateAudioPrompt(
+                    scriptText, i, totalPrompts, styleText, apiKey
+                );
+                
+                els.apOutput.value += `PROMPT ${i}:\n${response.prompt}\n\n`;
+                els.apOutput.scrollTop = els.apOutput.scrollHeight;
+                
+                const pct = Math.round((i / totalPrompts) * 100);
+                els.apProgressBar.style.width = `${pct}%`;
+                els.apProgressPct.textContent = `${pct}%`;
+            }
+            
+            showToast('Đã hoàn thành tạo chuỗi prompts!', 'success');
+            els.apProgressText.textContent = 'Hoàn thành!';
+        } catch (err) {
+            showToast(`Generating failed: ${err.message}`, 'error');
+            els.apProgressText.textContent = 'Lỗi!';
+            els.apProgressBar.style.backgroundColor = 'var(--status-error)';
+        } finally {
+            state.isGenerating = false;
+            els.btnApGenerate.disabled = false;
+            els.btnApGenerate.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Tạo Visual Prompts
+            `;
+        }
     }
 
     // ==================== Start ====================

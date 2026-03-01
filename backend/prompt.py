@@ -89,20 +89,22 @@ async def analyze_script_with_gemini(script_text: str, api_key: str) -> list[dic
             raise RuntimeError(f"Network error when calling Gemini API: {e}")
 
     # Handle HTTP errors
-    if response.status_code == 400:
-        raise ValueError("Invalid request to Gemini API. Please check your API key.")
-    elif response.status_code == 401 or response.status_code == 403:
-        raise ValueError("Gemini API key is invalid or unauthorized. Please check your API key.")
-    elif response.status_code == 429:
-        raise ValueError("Gemini API rate limit exceeded (quota exhausted). Please wait or use a different API key.")
-    elif response.status_code != 200:
+    if response.status_code != 200:
         detail = ""
         try:
             err_body = response.json()
             detail = err_body.get("error", {}).get("message", response.text[:200])
         except Exception:
             detail = response.text[:200]
-        raise RuntimeError(f"Gemini API error (HTTP {response.status_code}): {detail}")
+            
+        if response.status_code == 400:
+            raise ValueError(f"Invalid request to Gemini API: {detail}")
+        elif response.status_code in (401, 403):
+            raise ValueError(f"Gemini API key is invalid or unauthorized: {detail}")
+        elif response.status_code == 429:
+            raise ValueError("Gemini API rate limit exceeded (quota exhausted).")
+        else:
+            raise RuntimeError(f"Gemini API error (HTTP {response.status_code}): {detail}")
 
     # Parse response
     try:
@@ -165,3 +167,101 @@ async def analyze_script_with_gemini(script_text: str, api_key: str) -> list[dic
 
     logger.info(f"Gemini successfully parsed {len(validated)} scenes from script.")
     return validated
+
+
+async def generate_single_audio_prompt(script_text: str, prompt_index: int, total_prompts: int, visual_style: str, api_key: str) -> str:
+    """
+    Call Gemini API to generate a single image prompt for a specific index in an audio-synced sequence.
+    """
+    if not api_key or not api_key.strip():
+        raise ValueError("Gemini API key is required. Please enter your API key.")
+
+    url = f"{GEMINI_API_URL}?key={api_key}"
+
+    style_instruction = f"Use the following visual style for the prompt: {visual_style}" if visual_style else ""
+
+    system_prompt = f"""You are a professional video director and cinematographer.
+Your task is to generate ONE specific image generation prompt out of a sequence of {total_prompts} images for a video script.
+This is prompt number {prompt_index} out of {total_prompts}.
+
+{style_instruction}
+
+Read the provided script carefully. Identify the visual moment or scene that corresponds to the {prompt_index}/{total_prompts} fraction of the story's progression.
+Generate ONLY a detailed, cinematic image generation prompt describing that specific moment.
+The prompt should be in English, highly descriptive, include camera angles, lighting, mood, color palette, and artistic style.
+Format: "Cinematic [shot type] of [description], [lighting], [mood], [style details], photorealistic, 8k, volumetric lighting."
+
+IMPORTANT RULES:
+- Do not provide any introduction, explanation, or markdown formatting.
+- The entire response should be JUST the raw text of the image prompt.
+- Ensure the prompt flows logically as part of the overall sequence.
+"""
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"{system_prompt}\n\n--- SCRIPT START ---\n{script_text}\n--- SCRIPT END ---"}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.7,
+            "topP": 0.95,
+            "topK": 40,
+            "maxOutputTokens": 1024,
+            "responseMimeType": "text/plain",
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(url, json=payload)
+        except httpx.TimeoutException:
+            raise RuntimeError("Gemini API request timed out. Please try again.")
+        except httpx.RequestError as e:
+            raise RuntimeError(f"Network error when calling Gemini API: {e}")
+
+    # Handle HTTP errors
+    if response.status_code != 200:
+        detail = ""
+        try:
+            err_body = response.json()
+            detail = err_body.get("error", {}).get("message", response.text[:200])
+        except Exception:
+            detail = response.text[:200]
+            
+        if response.status_code == 400:
+            raise ValueError(f"Invalid request to Gemini API: {detail}")
+        elif response.status_code in (401, 403):
+            raise ValueError(f"Gemini API key is invalid or unauthorized: {detail}")
+        elif response.status_code == 429:
+            raise ValueError("Gemini API rate limit exceeded (quota exhausted).")
+        else:
+            raise RuntimeError(f"Gemini API error (HTTP {response.status_code}): {detail}")
+
+    # Parse response
+    try:
+        data = response.json()
+    except Exception:
+        raise RuntimeError("Failed to parse Gemini API response as JSON.")
+
+    try:
+        candidates = data.get("candidates", [])
+        if not candidates:
+            # Check for prompt feedback (blocked)
+            block_reason = data.get("promptFeedback", {}).get("blockReason", "")
+            if block_reason:
+                raise ValueError(f"Gemini blocked the request: {block_reason}")
+            raise RuntimeError("Gemini API returned no candidates.")
+
+        content = candidates[0].get("content", {})
+        parts = content.get("parts", [])
+        if not parts:
+            raise RuntimeError("Gemini API returned empty content.")
+
+        raw_text = parts[0].get("text", "")
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Unexpected Gemini API response structure: {e}")
+
+    return raw_text.strip()
