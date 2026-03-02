@@ -28,29 +28,15 @@
 
                 <!-- Navigation -->
                 <nav class="sidebar-nav">
-                    <a href="#" class="nav-item active" data-section="projects">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span>Projects</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="recent">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        <span>Recent Scripts</span>
-                    </a>
+                    <!-- Projects Removed by User Request -->
+                    <!-- Recent Scripts Removed by User Request -->
                     <a href="#" class="nav-item" data-section="settings">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <circle cx="12" cy="12" r="3" />
-                            <path
-                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            <polygon points="23 7 16 12 23 17 23 7" />
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                         </svg>
-                        <span>Settings</span>
+                        <span>Video Render</span>
                     </a>
                     <a href="#" class="nav-item" data-section="export">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -62,7 +48,7 @@
                         <span>Export</span>
                     </a>
                     <div style="height: 1px; background: var(--border-subtle); margin: 8px 12px;"></div>
-                    <a href="#" class="nav-item" data-section="autoprompt">
+                    <a href="#" class="nav-item active" data-section="autoprompt">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -87,31 +73,17 @@
             </div>
         </aside>
 
-        <!-- ========== MAIN CONTENT ========== -->
-        <main class="main-content" id="view-main">
+        <!-- ========== VIDEO RENDER CONTENT ========== -->
+        <main class="main-content" id="view-main" style="display: none;">
 
             <!-- Header bar -->
             <header class="main-header">
                 <div class="breadcrumb">
-                    <span class="breadcrumb-item">Workspaces</span>
+                    <span class="breadcrumb-item">Tools</span>
                     <span class="breadcrumb-sep">›</span>
-                    <span class="breadcrumb-item">Sci-Fi Story</span>
-                    <span class="breadcrumb-sep">›</span>
-                    <span class="breadcrumb-item current">Untitled Script</span>
+                    <span class="breadcrumb-item current">Video Render (Image → MP4)</span>
                 </div>
                 <div class="header-actions">
-                    <div class="gemini-key-group">
-                        <label class="gemini-key-label" for="gemini-api-key">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                            </svg>
-                            Gemini API Key
-                        </label>
-                        <input type="text" id="gemini-api-key" class="gemini-key-input"
-                            placeholder="Enter Gemini API key..." spellcheck="false">
-                    </div>
                     <button class="btn btn-secondary" id="btn-token-pool">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -120,85 +92,149 @@
                         </svg>
                         Access Token Pool
                     </button>
-                    <button class="btn btn-primary" id="btn-analyze">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                        </svg>
-                        Analyze Script
-                    </button>
-                    <button class="btn btn-secondary" id="btn-analyze-regex">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
-                            <polyline points="7.5 19.79 7.5 14.6 3 12" />
-                            <polyline points="21 12 16.5 14.6 16.5 19.79" />
-                            <line x1="12" y1="22.08" x2="12" y2="16.8" />
-                        </svg>
-                        Script by Regex
-                    </button>
-                    <button class="btn btn-icon" id="btn-menu">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            <circle cx="12" cy="5" r="2" />
-                            <circle cx="12" cy="12" r="2" />
-                            <circle cx="12" cy="19" r="2" />
-                        </svg>
-                    </button>
                 </div>
             </header>
 
-            <!-- Center + Right panels -->
+            <!-- Panels -->
             <div class="panels-container">
 
-                <!-- CENTER: Script Editor -->
-                <section class="panel-editor">
+                <!-- LEFT: Render Config -->
+                <section class="panel-editor" style="flex: 0 0 400px; max-width: 400px; display: flex; flex-direction: column;">
                     <div class="panel-header">
-                        <h2 class="panel-title">SCRIPT EDITOR</h2>
-                        <span class="word-count" id="word-count">Word Count: 0</span>
+                        <h2 class="panel-title">CẤU HÌNH RENDER</h2>
                     </div>
-                    <div class="editor-wrapper">
-                        <textarea id="script-editor" class="script-textarea"
-                            placeholder="Paste your story or YouTube script here..." spellcheck="false">Scene 1: Interior. Neon-lit lab.
-The scientist looks into the microscope...</textarea>
+                    <div class="editor-wrapper" style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding: 16px;">
+
+                        <!-- Input folder -->
+                        <div class="input-group">
+                            <label class="vr-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                Thư mục ảnh (Input)
+                            </label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="text" id="vr-input-dir" class="vr-input" placeholder="D:\path\to\images" spellcheck="false">
+                                <button class="btn btn-secondary btn-sm" id="btn-vr-browse-input" title="Chọn thư mục">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Output folder -->
+                        <div class="input-group">
+                            <label class="vr-label">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                Thư mục video (Output)
+                            </label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="text" id="vr-output-dir" class="vr-input" placeholder="Mặc định: input_folder/clips" spellcheck="false">
+                                <button class="btn btn-secondary btn-sm" id="btn-vr-browse-output" title="Chọn thư mục">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Settings group -->
+                        <div class="setup-group" style="background: var(--bg-card); padding: 12px; border: 1px solid var(--border-card); border-radius: var(--radius-sm);">
+                            <h3 class="panel-title" style="margin-bottom: 12px; color: #fff;">Cài Đặt FFmpeg</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Thời lượng video (giây):</label>
+                                <input type="number" id="vr-duration" value="8" min="1" max="60"
+                                    style="width: 80px; padding: 4px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Số luồng xử lý:</label>
+                                <input type="number" id="vr-workers" value="4" min="1" max="16"
+                                    style="width: 80px; padding: 4px; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Độ phân giải:</label>
+                                <span style="font-size: 12px; color: var(--accent); font-weight: 600;">1920 × 1080</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Codec:</label>
+                                <span style="font-size: 12px; color: var(--accent); font-weight: 600;">H.264 / yuv420p</span>
+                            </div>
+                        </div>
+
+                        <!-- Scan result -->
+                        <div id="vr-scan-info" style="display:none; text-align:center; padding:10px; background:var(--bg-input); border-radius:4px; font-size:12px; color:var(--accent); font-weight:bold;">
+                        </div>
+
+                        <!-- Progress -->
+                        <div class="progress-container" style="display: none;" id="vr-progress-container">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; font-weight: bold; color: var(--status-success);">
+                                <span id="vr-progress-text">Đang render...</span>
+                                <span id="vr-progress-pct">0%</span>
+                            </div>
+                            <div style="height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                                <div id="vr-progress-bar" style="height: 100%; width: 0%; background: var(--status-success); transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <button class="btn btn-secondary" id="btn-vr-scan" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                            Quét Thư Mục
+                        </button>
+
+                        <button class="btn btn-primary" id="btn-vr-render" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;" disabled>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            Bắt Đầu Render Video
+                        </button>
                     </div>
                 </section>
 
-                <!-- RIGHT: Scene Analysis -->
-                <section class="panel-scenes">
+                <!-- RIGHT: File List -->
+                <section class="panel-scenes" style="flex: 1;">
                     <div class="panel-header">
-                        <h2 class="panel-title">SCENE ANALYSIS</h2>
-                        <button class="btn btn-text" id="btn-refresh-all">Refresh All</button>
+                        <h2 class="panel-title">DANH SÁCH ẢNH & VIDEO</h2>
+                        <span class="vr-file-count" id="vr-file-count"></span>
                     </div>
-                    <div class="scenes-list" id="scenes-list">
-                        <!-- Scene cards rendered dynamically -->
-                        <div class="scenes-empty">
-                            <p>Click <strong>"Analyze Script"</strong> or <strong>"Script by Regex"</strong> to split
-                                your script into scenes.</p>
+                    <div class="scenes-list" id="vr-file-list" style="padding: 12px; overflow-y: auto;">
+                        <div class="scenes-empty" id="vr-empty-msg">
+                            <p>Nhập đường dẫn thư mục ảnh rồi bấm <strong>"Quét Thư Mục"</strong> để xem danh sách.</p>
                         </div>
                     </div>
                 </section>
             </div>
 
-            <!-- BOTTOM: Asset Gallery + Actions -->
-            <section class="panel-gallery">
+            <!-- BOTTOM: Video Preview Gallery -->
+            <section class="panel-gallery" id="vr-gallery">
                 <div class="gallery-header">
-                    <h2 class="panel-title">ASSET GALLERY</h2>
+                    <h2 class="panel-title">KẾT QUẢ RENDER</h2>
                     <div class="gallery-controls">
-                        <span class="grid-label">Grid Size</span>
-                        <button class="btn btn-grid active" id="btn-grid-sm" data-size="sm">SM</button>
-                        <button class="btn btn-grid" id="btn-grid-lg" data-size="lg">LG</button>
+                        <button class="btn btn-retry-failed" id="btn-vr-retry-failed" style="display:none;" title="Render lại các video lỗi">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            Retry Lỗi
+                        </button>
                     </div>
                 </div>
-                <div class="gallery-grid" id="gallery-grid">
-                    <!-- Images rendered dynamically -->
+                <div class="gallery-grid" id="vr-result-grid">
+                    <div class="scenes-empty" style="width:100%;padding:32px 0;text-align:center;">
+                        <p>Kết quả render sẽ hiển thị ở đây.</p>
+                    </div>
                 </div>
             </section>
         </main>
 
         <!-- ========== AUTO PROMPTER CONTENT ========== -->
-        <main class="main-content" id="view-autoprompt" style="display: none;">
+        <main class="main-content" id="view-autoprompt">
             <header class="main-header">
                 <div class="breadcrumb">
                     <span class="breadcrumb-item">Tools</span>
@@ -223,10 +259,11 @@ The scientist looks into the microscope...</textarea>
                                     <path
                                         d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
                                 </svg>
-                                Gemini API Key
+                                Bể Gemini API Key (1 key/dòng)
                             </label>
-                            <input type="text" id="ap-gemini-key" class="gemini-key-input" style="width: 100%;"
-                                placeholder="Enter Gemini API key...">
+                            <textarea id="ap-key-pool" class="script-textarea"
+                                style="min-height: 60px; max-height: 100px; font-size: 11px; font-family: monospace;"
+                                placeholder="Nhập API key, mỗi dòng 1 key..."></textarea>
                         </div>
 
                         <div class="input-group" style="flex: 1; display: flex; flex-direction: column;">
@@ -286,22 +323,76 @@ The scientist looks into the microscope...</textarea>
                             </svg>
                             Tạo Visual Prompts
                         </button>
+
+                        <!-- Thêm các nút điều khiển phụ trợ sau tạo -->
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button class="btn btn-secondary" id="btn-ap-stop"
+                                style="flex: 1; padding: 8px; color: var(--status-error); border-color: var(--status-error);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                </svg>
+                                Ngừng Gen
+                            </button>
+                            <button class="btn btn-secondary" id="btn-ap-retry-all" style="flex: 1; padding: 8px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.92-10.26l3.08-3.08" />
+                                </svg>
+                                Lặp Lại Tất Cả
+                            </button>
+                            <button class="btn btn-secondary" id="btn-ap-retry-failed"
+                                style="flex: 1; padding: 8px; color: var(--accent);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                Gen Lỗi
+                            </button>
+                        </div>
                     </div>
                 </section>
 
-                <!-- RIGHT: Output -->
-                <section class="panel-editor" style="flex: 1;">
+                <!-- RIGHT: Output (Scene Cards) -->
+                <section class="panel-scenes" style="flex: 1;">
                     <div class="panel-header">
                         <h2 class="panel-title">SCRIPT SEGMENTS & VISUAL PROMPTS</h2>
                         <button class="btn btn-text" id="btn-ap-clear">Clear All</button>
                     </div>
-                    <div class="editor-wrapper" style="padding: 0; background: var(--bg-dark);">
-                        <textarea id="ap-output" class="script-textarea"
-                            style="border: none; border-radius: 0; min-height: 100%; font-family: monospace; font-size: 12px; white-space: pre-wrap; background: transparent; padding: 20px; line-height: 1.6;"
-                            readonly placeholder="Generated prompts will appear here..."></textarea>
+                    <div class="scenes-list" id="ap-scenes-list" style="padding: 12px; overflow-y: auto;">
+                        <div class="scenes-empty" id="ap-empty-msg">
+                            <p>Nhập API key và kịch bản, bấm <strong>"Tạo Visual Prompts"</strong> để bắt đầu.</p>
+                        </div>
                     </div>
                 </section>
             </div>
+
+            <!-- AP ASSET GALLERY -->
+            <section class="panel-gallery" id="ap-gallery">
+                <div class="gallery-header">
+                    <h2 class="panel-title">GENERATED IMAGES</h2>
+                    <div class="gallery-controls">
+                        <button class="btn btn-retry-failed" id="btn-ap-retry-failed-images" title="Gen lại các ảnh bị lỗi">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            Gen Lỗi
+                        </button>
+                        <span class="grid-label" style="margin-left:12px;">Grid Size</span>
+                        <button class="btn btn-grid active" id="btn-ap-grid-sm" data-size="sm">SM</button>
+                        <button class="btn btn-grid" id="btn-ap-grid-lg" data-size="lg">LG</button>
+                    </div>
+                </div>
+                <div class="gallery-grid" id="ap-gallery-grid">
+                    <div class="scenes-empty" style="width:100%;padding:32px 0;text-align:center;">
+                        <p>Generate prompts first, then click <strong>"Generate All Images"</strong> to create images.
+                        </p>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 

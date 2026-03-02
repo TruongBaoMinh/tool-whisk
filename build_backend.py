@@ -11,6 +11,7 @@ Output:
 import subprocess
 import sys
 
+
 def main():
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -42,6 +43,7 @@ def main():
         "--hidden-import", "models",
         "--hidden-import", "scene_analyzer",
         "--hidden-import", "image_generator",
+        "--hidden-import", "prompt",
         # Show console window for debugging (change to --noconsole for release)
         "--console",
         # Confirm overwrite
@@ -53,12 +55,17 @@ def main():
     print("=" * 60)
     print("Building backend.exe with PyInstaller...")
     print("=" * 60)
+
     result = subprocess.run(cmd, cwd=".")
     if result.returncode == 0:
-        print("\n✓ Build successful! Output: dist/backend/backend.exe")
-    else:
-        print(f"\n✗ Build failed with exit code {result.returncode}")
-        sys.exit(1)
+        print("\nBuild successful. Output: dist/backend/backend.exe")
+        return
+
+    print(f"\nBuild failed with exit code {result.returncode}")
+    if result.returncode != 0:
+        print("PyInstaller may be missing. Install it with: pip install pyinstaller")
+    sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

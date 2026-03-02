@@ -26,8 +26,10 @@ from models import (
     GenerateImagesRequest, RegenerateRequest, UpdatePromptRequest,
     GenerationStatus, ImageData, ExportResponse,
     GenerateAudioPromptRequest, GenerateAudioPromptResponse,
+    SaveApPromptsRequest,
+    VideoRenderRequest, VideoRenderSingleRequest,
 )
-from scene_analyzer import analyze_script
+from scene_analyzer import analyze_script, analyze_script_by_regex
 from prompt import generate_single_audio_prompt
 from image_generator import get_queue
 
@@ -134,6 +136,52 @@ async def api_analyze_script(req: ScriptAnalyzeRequest):
     )
 
 
+@app.post("/analyze-script-regex", response_model=ScriptAnalyzeResponse)
+async def api_analyze_script_regex(req: ScriptAnalyzeRequest):
+    """Analyze script text and split into scenes with regex-based rules."""
+    script_id = req.script_id
+    word_count = len(req.script_text.split())
+
+    await save_script(script_id, req.script_text, word_count)
+    await delete_scenes_for_script(script_id)
+
+    try:
+        parsed = analyze_script_by_regex(req.script_text)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not parsed:
+        raise HTTPException(status_code=400, detail="No scenes could be parsed from the script.")
+
+    scene_list: list[SceneData] = []
+    for ps in parsed:
+        sid = await insert_scene(
+            script_id=script_id,
+            scene_number=ps["scene_number"],
+            ts_start=ps["timestamp_start"],
+            ts_end=ps["timestamp_end"],
+            raw_text=ps["raw_text"],
+            prompt=ps["prompt"],
+        )
+        scene_list.append(SceneData(
+            id=sid,
+            scene_number=ps["scene_number"],
+            timestamp_start=ps["timestamp_start"],
+            timestamp_end=ps["timestamp_end"],
+            raw_text=ps["raw_text"],
+            prompt=ps["prompt"],
+            status="pending",
+        ))
+
+    return ScriptAnalyzeResponse(
+        script_id=script_id,
+        total_scenes=len(scene_list),
+        scenes=scene_list,
+    )
+
+
 @app.post("/generate-audio-prompt", response_model=GenerateAudioPromptResponse)
 async def api_generate_audio_prompt(req: GenerateAudioPromptRequest):
     """Generate a single image prompt for an audio-synced sequence."""
@@ -164,6 +212,34 @@ async def api_update_prompt(req: UpdatePromptRequest):
     """Update a scene's image prompt."""
     await update_scene_prompt(req.scene_id, req.prompt)
     return {"status": "ok", "scene_id": req.scene_id}
+
+
+# AP_SCRIPT_ID is a reserved script_id dedicated for Auto Prompter scenes
+AP_SCRIPT_ID = 2
+
+@app.post("/ap/save-prompts")
+async def api_save_ap_prompts(req: SaveApPromptsRequest):
+    """Save Auto Prompter generated prompts as scenes in script_id=2 for image generation."""
+    await delete_scenes_for_script(AP_SCRIPT_ID)
+    await save_script(AP_SCRIPT_ID, "auto_prompter", len(req.prompts))
+
+    scene_list = []
+    for i, prompt_text in enumerate(req.prompts):
+        scene_number = i + 1
+        ts_start_sec = int(i * req.pacing)
+        ts_end_sec = int((i + 1) * req.pacing)
+        def fmt(s): return f"{s // 60:02d}:{s % 60:02d}"
+        sid = await insert_scene(
+            script_id=AP_SCRIPT_ID,
+            scene_number=scene_number,
+            ts_start=fmt(ts_start_sec),
+            ts_end=fmt(ts_end_sec),
+            raw_text=prompt_text,
+            prompt=prompt_text,
+        )
+        scene_list.append({"id": sid, "scene_number": scene_number, "prompt": prompt_text})
+
+    return {"status": "ok", "total": len(scene_list), "script_id": AP_SCRIPT_ID, "scenes": scene_list}
 
 
 @app.post("/generate-images")
@@ -259,12 +335,11 @@ async def api_delete_scene(scene_id: int):
 
     return {"status": "ok", "scene_id": scene_id}
 
-
 @app.get("/status/{script_id}", response_model=GenerationStatus)
 async def api_get_status(script_id: int):
     """Get generation progress for a script."""
-    scenes = await get_scenes_for_script(script_id)
-    images = await get_images_for_script(script_id)
+    scenes: list[dict] = await get_scenes_for_script(script_id)
+    images: list[dict] = await get_images_for_script(script_id)
 
     total = len(scenes)
     completed = sum(1 for s in scenes if s["status"] == "success")
@@ -319,8 +394,166 @@ async def api_export_zip(script_id: int = 1):
     )
 
 
+# ---------- Video Render Endpoints ----------
+
+# Background task state for video rendering
+_video_render_state = {
+    "running": False,
+    "results": [],
+    "total": 0,
+    "completed": 0,
+    "errors": 0,
+    "rendering": 0,
+}
+
+
+@app.post("/video/scan")
+async def api_video_scan(req: VideoRenderRequest):
+    """Scan input directory for images and return file list."""
+    from ffmpeg_renderer import get_renderer
+    renderer = get_renderer()
+    input_path = Path(req.input_dir)
+
+    if not input_path.is_dir():
+        raise HTTPException(status_code=400, detail=f"Directory not found: {req.input_dir}")
+
+    try:
+        images = renderer.scan_images(input_path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {
+        "status": "ok",
+        "input_dir": str(input_path),
+        "total": len(images),
+        "images": [
+            {
+                "name": img.name,
+                "path": str(img),
+                "size_kb": round(img.stat().st_size / 1024, 1),
+            }
+            for img in images
+        ],
+    }
+
+
+@app.post("/video/render")
+async def api_video_render(req: VideoRenderRequest):
+    """
+    Start batch rendering all images in input_dir to videos.
+    Runs in background thread pool.
+    """
+    import asyncio
+    from ffmpeg_renderer import FfmpegBatchRenderer
+
+    input_path = Path(req.input_dir)
+    output_path = Path(req.output_dir) if req.output_dir else input_path / "clips"
+
+    if not input_path.is_dir():
+        raise HTTPException(status_code=400, detail=f"Directory not found: {req.input_dir}")
+
+    if _video_render_state["running"]:
+        raise HTTPException(status_code=409, detail="A render job is already running.")
+
+    renderer = FfmpegBatchRenderer(
+        duration=req.duration,
+    )
+    images = renderer.scan_images(input_path)
+    if not images:
+        raise HTTPException(status_code=400, detail="No images found in the directory.")
+
+    # Reset state
+    _video_render_state["running"] = True
+    _video_render_state["results"] = []
+    _video_render_state["total"] = len(images)
+    _video_render_state["completed"] = 0
+    _video_render_state["errors"] = 0
+    _video_render_state["rendering"] = 0
+
+    def on_progress(image_name, status):
+        if status == "rendering":
+            _video_render_state["rendering"] += 1
+        elif status == "success":
+            _video_render_state["completed"] += 1
+            _video_render_state["rendering"] = max(0, _video_render_state["rendering"] - 1)
+        elif status == "error":
+            _video_render_state["errors"] += 1
+            _video_render_state["rendering"] = max(0, _video_render_state["rendering"] - 1)
+
+    def run_render():
+        try:
+            results = renderer.process_folder(
+                input_dir=str(input_path),
+                output_dir=str(output_path),
+                max_workers=req.max_workers,
+                on_progress=on_progress,
+            )
+            _video_render_state["results"] = [
+                {
+                    "image_name": r.image_name,
+                    "video_name": r.video_name,
+                    "status": r.status,
+                    "error_message": r.error_message,
+                }
+                for r in results
+            ]
+        except Exception as e:
+            print(f"[VideoRender] Fatal error: {e}")
+        finally:
+            _video_render_state["running"] = False
+
+    # Run in background thread to not block the event loop
+    import threading
+    t = threading.Thread(target=run_render, daemon=True)
+    t.start()
+
+    return {
+        "status": "ok",
+        "message": f"Started rendering {len(images)} videos",
+        "total": len(images),
+        "output_dir": str(output_path),
+    }
+
+
+@app.get("/video/status")
+async def api_video_status():
+    """Get current video render progress."""
+    return {
+        "running": _video_render_state["running"],
+        "total": _video_render_state["total"],
+        "completed": _video_render_state["completed"],
+        "errors": _video_render_state["errors"],
+        "rendering": _video_render_state["rendering"],
+        "results": _video_render_state["results"],
+    }
+
+
+@app.post("/video/render-single")
+async def api_video_render_single(req: VideoRenderSingleRequest):
+    """Render a single image to video (synchronous)."""
+    from ffmpeg_renderer import FfmpegBatchRenderer
+
+    image_path = Path(req.image_path)
+    if not image_path.is_file():
+        raise HTTPException(status_code=400, detail=f"Image not found: {req.image_path}")
+
+    output_dir = Path(req.output_dir) if req.output_dir else image_path.parent / "clips"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / (image_path.stem + ".mp4")
+
+    renderer = FfmpegBatchRenderer(duration=req.duration)
+    result = renderer.render_single(image_path, output_path)
+
+    return {
+        "status": result.status,
+        "image_name": result.image_name,
+        "video_name": result.video_name,
+        "error_message": result.error_message,
+    }
+
+
 # ---------- Run directly ----------
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=cfg.host, port=cfg.port, reload=True)
+    uvicorn.run(app, host=cfg.host, port=cfg.port, reload=False)

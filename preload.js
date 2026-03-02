@@ -3,7 +3,7 @@
  * Exposes a safe API bridge from main process to renderer.
  */
 
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 const API_BASE = 'http://127.0.0.1:8001';
 
@@ -32,6 +32,13 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 contextBridge.exposeInMainWorld('api', {
+    /**
+     * Open a native folder picker dialog.
+     * @param {string} title - dialog title
+     * @returns {Promise<string|null>} selected folder path or null
+     */
+    selectFolder: (title) => ipcRenderer.invoke('dialog:openDirectory', title),
+
     /**
      * Analyze script text → returns scenes JSON
      * @param {string} scriptText
@@ -63,6 +70,19 @@ contextBridge.exposeInMainWorld('api', {
                 visual_style: visualStyle,
                 gemini_api_key: geminiApiKey,
             }),
+        });
+        return res.json();
+    },
+
+    /**
+     * Save Auto Prompter prompts as scenes in DB (script_id=2) for image gen.
+     * @param {string[]} prompts - list of prompt strings
+     * @param {number} pacing - seconds per prompt
+     */
+    saveApPrompts: async (prompts = [], pacing = 10) => {
+        const res = await apiFetch('/ap/save-prompts', {
+            method: 'POST',
+            body: JSON.stringify({ prompts, pacing }),
         });
         return res.json();
     },
@@ -156,15 +176,80 @@ contextBridge.exposeInMainWorld('api', {
     },
 
     /**
-     * Get static image URL
+     * Resolve static image URL from backend path or file name
      */
-    getImageUrl: (fileName) => `${API_BASE}/static/${fileName}`,
+    getImageUrl: (pathOrFileName) => {
+        if (!pathOrFileName) return '';
+        if (/^https?:\/\//i.test(pathOrFileName)) return pathOrFileName;
+        if (pathOrFileName.startsWith('/')) return `${API_BASE}${pathOrFileName}`;
+        return `${API_BASE}/static/${pathOrFileName}`;
+    },
 
     /**
      * List projects
      */
     getProjects: async () => {
         const res = await apiFetch('/projects');
+        return res.json();
+    },
+
+    // ==================== Video Render ====================
+
+    /**
+     * Scan image folder for renderable files
+     * @param {string} inputDir
+     */
+    videoScan: async (inputDir) => {
+        const res = await apiFetch('/video/scan', {
+            method: 'POST',
+            body: JSON.stringify({ input_dir: inputDir }),
+        });
+        return res.json();
+    },
+
+    /**
+     * Start batch video rendering
+     * @param {string} inputDir
+     * @param {string} outputDir
+     * @param {number} duration
+     * @param {number} maxWorkers
+     */
+    videoRender: async (inputDir, outputDir = '', duration = 8, maxWorkers = 4) => {
+        const res = await apiFetch('/video/render', {
+            method: 'POST',
+            body: JSON.stringify({
+                input_dir: inputDir,
+                output_dir: outputDir,
+                duration: duration,
+                max_workers: maxWorkers,
+            }),
+        });
+        return res.json();
+    },
+
+    /**
+     * Get video render status
+     */
+    videoStatus: async () => {
+        const res = await apiFetch('/video/status');
+        return res.json();
+    },
+
+    /**
+     * Render a single image to video
+     * @param {string} imagePath
+     * @param {string} outputDir
+     * @param {number} duration
+     */
+    videoRenderSingle: async (imagePath, outputDir = '', duration = 8) => {
+        const res = await apiFetch('/video/render-single', {
+            method: 'POST',
+            body: JSON.stringify({
+                image_path: imagePath,
+                output_dir: outputDir,
+                duration: duration,
+            }),
+        });
         return res.json();
     },
 });

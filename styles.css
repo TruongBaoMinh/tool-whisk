@@ -658,6 +658,295 @@ html, body {
     animation: spin 0.8s linear infinite;
 }
 
+/* Error item */
+.gallery-item-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e74c3c !important;
+    gap: 4px;
+}
+
+/* Per-image regen button */
+.btn-gallery-regen {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+
+.gallery-item:hover .btn-gallery-regen {
+    opacity: 1;
+}
+
+.gallery-item-error .btn-gallery-regen {
+    opacity: 1;
+}
+
+.btn-gallery-regen:hover {
+    background: var(--accent);
+}
+
+/* Retry failed button in gallery header */
+.btn-retry-failed {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-retry-failed:hover {
+    background: rgba(231, 76, 60, 0.25);
+}
+
+
+/* ==================== VIDEO RENDER ==================== */
+
+/* Labels */
+.vr-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+/* Text inputs */
+.vr-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: 'Inter', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.vr-input::placeholder {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.vr-input:focus {
+    border-color: var(--accent);
+}
+
+/* File count badge */
+.vr-file-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-left: auto;
+}
+
+/* File list items */
+.vr-file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.vr-file-item:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+}
+
+.vr-file-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+.vr-file-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vr-file-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vr-file-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.vr-file-status {
+    flex-shrink: 0;
+}
+
+.vr-file-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.vr-file-badge.pending {
+    background: rgba(107, 96, 88, 0.2);
+    color: var(--text-muted);
+}
+
+.vr-file-badge.rendering {
+    background: rgba(232, 93, 44, 0.15);
+    color: var(--accent);
+}
+
+.vr-file-badge.success {
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--status-success);
+}
+
+.vr-file-badge.error {
+    background: rgba(239, 83, 80, 0.15);
+    color: var(--status-error);
+}
+
+/* Result gallery items */
+.vr-result-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    position: relative;
+    min-height: 120px;
+    transition: border-color 0.2s;
+}
+
+.vr-result-item:hover {
+    border-color: var(--accent);
+}
+
+.vr-result-success {
+    border-left: 3px solid var(--status-success);
+}
+
+.vr-result-error {
+    border-left: 3px solid var(--status-error);
+}
+
+.vr-result-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vr-result-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.vr-result-status {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.vr-result-status.success {
+    color: var(--status-success);
+}
+
+.vr-result-status.error {
+    color: var(--status-error);
+}
+
+.vr-result-error-msg {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    max-height: 30px;
+    overflow: hidden;
+    line-height: 1.3;
+}
+
+/* Re-render button on result items */
+.btn-vr-rerender {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--border-card);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.15s;
+}
+
+.vr-result-item:hover .btn-vr-rerender {
+    opacity: 1;
+}
+
+.vr-result-error .btn-vr-rerender {
+    opacity: 1;
+}
+
+.btn-vr-rerender:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
 
 /* ==================== FOOTER BAR ==================== */
 .app-footer {

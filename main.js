@@ -3,10 +3,26 @@
  * Manages window lifecycle and spawns Python backend.
  */
 
-const { app, BrowserWindow, dialog } = require('electron');
+const electron = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+
+if (typeof electron === 'string') {
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+
+    const relaunched = spawn(electron, [process.cwd()], {
+        stdio: 'inherit',
+        env,
+        detached: true,
+    });
+
+    relaunched.unref();
+    process.exit(0);
+}
+
+const { app, BrowserWindow, dialog, ipcMain } = electron;
 
 let mainWindow = null;
 let backendProcess = null;
@@ -111,6 +127,16 @@ function stopBackend() {
         backendProcess = null;
     }
 }
+
+// ── IPC handlers ──
+ipcMain.handle('dialog:openDirectory', async (event, title) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: title || 'Chọn thư mục',
+        properties: ['openDirectory'],
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+});
 
 app.whenReady().then(() => {
     startBackend();

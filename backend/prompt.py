@@ -1,6 +1,6 @@
 """
-Gemini API integration for script analysis.
-Calls Gemini 2.0 Flash to split a script into scenes and generate image prompts.
+Google Generative Language API integration for script analysis.
+Calls gemma-3-1b-it to split a script into scenes and generate image prompts.
 """
 
 import json
@@ -9,7 +9,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-1b-it:generateContent"
 
 SYSTEM_PROMPT = """You are a professional video director and cinematographer.
 Your task is to analyze a script/story and break it down into discrete visual scenes for video production.

@@ -3,7 +3,7 @@
  * Handles all UI logic, API calls, and dynamic rendering.
  */
 
-;(function () {
+; (function () {
     'use strict';
 
     // ==================== State ====================
@@ -21,53 +21,106 @@
         generationLog: [],
         prevSceneStatuses: {},
         geminiApiKey: '',
+        apStopRequested: false,
+        apImages: [],
+        apPollTimer: null,
+        // Video Render
+        vrScannedFiles: [],         // [{name, path, size_kb}]
+        vrOutputDir: '',            // resolved output dir from backend
+        vrPollTimer: null,
+        vrRendering: false,
     };
+    const TIMEOUTS_BETWEEN_REQUESTS = 3000;
 
     // ==================== DOM Refs ====================
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
     const els = {
-        editor:        $('#script-editor'),
-        wordCount:     $('#word-count'),
-        scenesList:    $('#scenes-list'),
-        galleryGrid:   $('#gallery-grid'),
-        btnAnalyze:    $('#btn-analyze'),
+        editor: $('#script-editor'),
+        wordCount: $('#word-count'),
+        scenesList: $('#scenes-list'),
+        galleryGrid: $('#gallery-grid'),
+        btnAnalyze: $('#btn-analyze'),
         btnAnalyzeRegex: $('#btn-analyze-regex'),
-        btnGenerateAll:$('#btn-generate-all'),
-        btnExportZip:  $('#btn-export-zip'),
+        btnGenerateAll: $('#btn-generate-all'),
+        btnExportZip: $('#btn-export-zip'),
         btnRefreshAll: $('#btn-refresh-all'),
-        btnGridSm:     $('#btn-grid-sm'),
-        btnGridLg:     $('#btn-grid-lg'),
-        batchStatus:   $('#batch-status'),
-        progressText:  $('#progress-text'),
-        btnTokenPool:  $('#btn-token-pool'),
-        tokenModal:    $('#token-pool-modal'),
-        errorModal:    $('#error-popup-modal'),
-        logPanel:      $('#log-panel'),
-        logEntries:    $('#log-entries'),
+        btnGridSm: $('#btn-grid-sm'),
+        btnGridLg: $('#btn-grid-lg'),
+        batchStatus: $('#batch-status'),
+        progressText: $('#progress-text'),
+        btnTokenPool: $('#btn-token-pool'),
+        tokenModal: $('#token-pool-modal'),
+        errorModal: $('#error-popup-modal'),
+        logPanel: $('#log-panel'),
+        logEntries: $('#log-entries'),
         geminiKeyInput: $('#gemini-api-key'),
 
+        // Video Render
+        vrInputDir: $('#vr-input-dir'),
+        vrOutputDir: $('#vr-output-dir'),
+        vrDuration: $('#vr-duration'),
+        vrWorkers: $('#vr-workers'),
+        vrScanInfo: $('#vr-scan-info'),
+        vrFileList: $('#vr-file-list'),
+        vrFileCount: $('#vr-file-count'),
+        vrEmptyMsg: $('#vr-empty-msg'),
+        vrResultGrid: $('#vr-result-grid'),
+        vrProgressContainer: $('#vr-progress-container'),
+        vrProgressText: $('#vr-progress-text'),
+        vrProgressPct: $('#vr-progress-pct'),
+        vrProgressBar: $('#vr-progress-bar'),
+        btnVrScan: $('#btn-vr-scan'),
+        btnVrRender: $('#btn-vr-render'),
+        btnVrRetryFailed: $('#btn-vr-retry-failed'),
+        btnVrBrowseInput: $('#btn-vr-browse-input'),
+        btnVrBrowseOutput: $('#btn-vr-browse-output'),
+
         // Auto Prompter
-        apGeminiKey:   $('#ap-gemini-key'),
-        apScript:      $('#ap-script'),
-        apDuration:    $('#ap-duration'),
-        apPacing:      $('#ap-pacing'),
-        apStats:       $('#ap-stats'),
-        apStyle:       $('#ap-style'),
-        apOutput:      $('#ap-output'),
+        apKeyPool: $('#ap-key-pool'),
+        apScript: $('#ap-script'),
+        apDuration: $('#ap-duration'),
+        apPacing: $('#ap-pacing'),
+        apStats: $('#ap-stats'),
+        apStyle: $('#ap-style'),
+        apScenesList: $('#ap-scenes-list'),
+        apEmptyMsg: $('#ap-empty-msg'),
         btnApGenerate: $('#btn-ap-generate'),
-        btnApClear:    $('#btn-ap-clear'),
+        btnApClear: $('#btn-ap-clear'),
         apProgressContainer: $('#ap-progress-container'),
         apProgressText: $('#ap-progress-text'),
-        apProgressPct:  $('#ap-progress-pct'),
-        apProgressBar:  $('#ap-progress-bar'),
-        viewMain:      $('#view-main'),
-        viewAutoPrompt:$('#view-autoprompt'),
+        apProgressPct: $('#ap-progress-pct'),
+        apProgressBar: $('#ap-progress-bar'),
+        viewMain: $('#view-main'),
+        viewAutoPrompt: $('#view-autoprompt'),
+        btnApStop: $('#btn-ap-stop'),
+        btnApRetryAll: $('#btn-ap-retry-all'),
+        btnApRetryFailed: $('#btn-ap-retry-failed'),
+        apGalleryGrid: $('#ap-gallery-grid'),
+        btnApGridSm: $('#btn-ap-grid-sm'),
+        btnApGridLg: $('#btn-ap-grid-lg'),
     };
 
     // ==================== Init ====================
+    function switchSection(section) {
+        $$('.nav-item').forEach((item) => {
+            item.classList.toggle('active', item.dataset.section === section);
+        });
+
+        if (section === 'autoprompt') {
+            if (els.viewMain) els.viewMain.style.display = 'none';
+            if (els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'flex';
+        } else {
+            if (els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'none';
+            if (els.viewMain) els.viewMain.style.display = 'flex';
+        }
+    }
+
     function init() {
+        // Set Auto Prompter as default view logic
+        switchSection('autoprompt');
+
         updateWordCount();
         bindEvents();
         loadTokenPool();
@@ -77,14 +130,14 @@
     }
 
     function bindEvents() {
-        els.editor.addEventListener('input', updateWordCount);
-        els.btnAnalyze.addEventListener('click', analyzeScript);
-        els.btnAnalyzeRegex.addEventListener('click', analyzeScriptRegex);
-        els.btnGenerateAll.addEventListener('click', generateAllImages);
-        els.btnExportZip.addEventListener('click', exportZip);
-        els.btnRefreshAll.addEventListener('click', refreshAll);
-        els.btnGridSm.addEventListener('click', () => setGridSize('sm'));
-        els.btnGridLg.addEventListener('click', () => setGridSize('lg'));
+        if (els.editor) els.editor.addEventListener('input', updateWordCount);
+        if (els.btnAnalyze) els.btnAnalyze.addEventListener('click', analyzeScript);
+        if (els.btnAnalyzeRegex) els.btnAnalyzeRegex.addEventListener('click', analyzeScriptRegex);
+        if (els.btnGenerateAll) els.btnGenerateAll.addEventListener('click', generateAllImages);
+        if (els.btnExportZip) els.btnExportZip.addEventListener('click', exportZip);
+        if (els.btnRefreshAll) els.btnRefreshAll.addEventListener('click', refreshAll);
+        if (els.btnGridSm) els.btnGridSm.addEventListener('click', () => setGridSize('sm'));
+        if (els.btnGridLg) els.btnGridLg.addEventListener('click', () => setGridSize('lg'));
 
         // Token pool modal
         els.btnTokenPool.addEventListener('click', openTokenModal);
@@ -115,16 +168,7 @@
         $$('.nav-item').forEach((item) => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
-                $$('.nav-item').forEach((n) => n.classList.remove('active'));
-                item.classList.add('active');
-                
-                if (item.dataset.section === 'autoprompt') {
-                    if(els.viewMain) els.viewMain.style.display = 'none';
-                    if(els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'flex';
-                } else {
-                    if(els.viewAutoPrompt) els.viewAutoPrompt.style.display = 'none';
-                    if(els.viewMain) els.viewMain.style.display = 'flex';
-                }
+                switchSection(item.dataset.section);
             });
         });
 
@@ -136,16 +180,92 @@
             const prompts = Math.max(1, Math.ceil(dur / pacing));
             els.apStats.textContent = `Số prompts: ${prompts}`;
         };
-        if(els.apDuration) els.apDuration.addEventListener('input', calcApStats);
-        if(els.apPacing) els.apPacing.addEventListener('input', calcApStats);
-        
+        if (els.apDuration) els.apDuration.addEventListener('input', calcApStats);
+        if (els.apPacing) els.apPacing.addEventListener('input', calcApStats);
+
         // Auto Prompter actions
-        if(els.btnApClear) els.btnApClear.addEventListener('click', () => { els.apOutput.value = ''; });
-        if(els.btnApGenerate) els.btnApGenerate.addEventListener('click', apGeneratePrompts);
+        if (els.btnApClear) els.btnApClear.addEventListener('click', () => {
+            if (els.apScenesList) {
+                els.apScenesList.innerHTML = '';
+                if (els.apEmptyMsg) {
+                    els.apScenesList.appendChild(els.apEmptyMsg);
+                    els.apEmptyMsg.style.display = '';
+                }
+            }
+        });
+        if (els.btnApGenerate) els.btnApGenerate.addEventListener('click', () => apGeneratePrompts());
+        if (els.btnApStop) els.btnApStop.addEventListener('click', () => { state.apStopRequested = true; });
+        if (els.btnApRetryAll) els.btnApRetryAll.addEventListener('click', () => apGeneratePrompts('all'));
+        if (els.btnApRetryFailed) els.btnApRetryFailed.addEventListener('click', () => apGeneratePrompts('failed'));
+
+        // AP Gallery: Retry failed images button
+        const btnRetryFailedImages = document.getElementById('btn-ap-retry-failed-images');
+        if (btnRetryFailedImages) btnRetryFailedImages.addEventListener('click', apRetryFailedImages);
+
+        // AP Gallery: delegate click for per-image regen buttons
+        if (els.apGalleryGrid) {
+            els.apGalleryGrid.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-gallery-regen');
+                if (btn) {
+                    const sceneId = parseInt(btn.dataset.sceneId, 10);
+                    if (sceneId) apRegenSingleImage(sceneId);
+                }
+            });
+        }
+
+        if (els.apScenesList) {
+            els.apScenesList.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-ap-regenerate')) {
+                    const card = e.target.closest('.scene-card');
+                    if (card) {
+                        const index = parseInt(card.dataset.promptIndex);
+                        apGeneratePrompts('single', [index]);
+                    }
+                }
+            });
+        }
+
+        // AP Gallery grid size
+        if (els.btnApGridSm) els.btnApGridSm.addEventListener('click', () => {
+            if (els.apGalleryGrid) els.apGalleryGrid.classList.remove('grid-lg');
+            if (els.btnApGridSm) els.btnApGridSm.classList.add('active');
+            if (els.btnApGridLg) els.btnApGridLg.classList.remove('active');
+        });
+        if (els.btnApGridLg) els.btnApGridLg.addEventListener('click', () => {
+            if (els.apGalleryGrid) els.apGalleryGrid.classList.add('grid-lg');
+            if (els.btnApGridLg) els.btnApGridLg.classList.add('active');
+            if (els.btnApGridSm) els.btnApGridSm.classList.remove('active');
+        });
+
+        // ==================== Video Render Events ====================
+        if (els.btnVrBrowseInput) els.btnVrBrowseInput.addEventListener('click', async () => {
+            const folder = await window.api.selectFolder('Chọn thư mục ảnh (Input)');
+            if (folder && els.vrInputDir) els.vrInputDir.value = folder;
+        });
+        if (els.btnVrBrowseOutput) els.btnVrBrowseOutput.addEventListener('click', async () => {
+            const folder = await window.api.selectFolder('Chọn thư mục video (Output)');
+            if (folder && els.vrOutputDir) els.vrOutputDir.value = folder;
+        });
+
+        if (els.btnVrScan) els.btnVrScan.addEventListener('click', vrScanFolder);
+        if (els.btnVrRender) els.btnVrRender.addEventListener('click', vrStartRender);
+        if (els.btnVrRetryFailed) els.btnVrRetryFailed.addEventListener('click', vrRetryFailed);
+
+        // VR result grid — delegate click for single re-render buttons
+        if (els.vrResultGrid) {
+            els.vrResultGrid.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-vr-rerender');
+                if (btn) {
+                    const imgPath = btn.dataset.imagePath;
+                    if (imgPath) vrRenderSingle(imgPath);
+                }
+            });
+        }
     }
 
     // ==================== Word Count ====================
     function updateWordCount() {
+        if (!els.editor || !els.wordCount) return;
         const text = els.editor.value.trim();
         const count = text ? text.split(/\s+/).length : 0;
         els.wordCount.textContent = `Word Count: ${count}`;
@@ -317,7 +437,7 @@
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
                     const sceneId = parseInt(ta.dataset.sceneId);
-                    window.api.updatePrompt(sceneId, ta.value).catch(() => {});
+                    window.api.updatePrompt(sceneId, ta.value).catch(() => { });
                 }, 800);
             });
         });
@@ -369,8 +489,8 @@
             const saved = localStorage.getItem('ai_studio_gemini_key');
             if (saved) {
                 state.geminiApiKey = saved;
-                if(els.geminiKeyInput) els.geminiKeyInput.value = saved;
-                if(els.apGeminiKey) els.apGeminiKey.value = saved;
+                if (els.geminiKeyInput) els.geminiKeyInput.value = saved;
+                if (els.apKeyPool) els.apKeyPool.value = saved;
             }
         } catch (e) { /* ignore */ }
     }
@@ -532,29 +652,72 @@
     }
 
     // ==================== Generate Images ====================
+    // AP_SCRIPT_ID=2 is used for Auto Prompter scenes
+    const AP_SCRIPT_ID = 2;
+
+    function isApViewActive() {
+        return els.viewAutoPrompt && els.viewAutoPrompt.style.display !== 'none';
+    }
+
     async function generateAllImages() {
         if (state.isGenerating) return;
-        if (!state.scenes.length) {
-            showToast('Analyze a script first.', 'error');
-            return;
-        }
 
-        if (!state.tokenPool.length) {
-            showToast('No tokens in pool. Click "Access Token Pool" to add tokens.', 'error');
-            return;
-        }
+        if (isApViewActive()) {
+            // Collect all successful AP prompt card texts
+            const cards = Array.from(els.apScenesList.querySelectorAll('.scene-card.status-success'));
+            if (cards.length === 0) {
+                showToast('Hãy tạo prompts trước rồi mới gen ảnh.', 'error');
+                return;
+            }
 
-        state.isGenerating = true;
-        els.btnGenerateAll.disabled = true;
+            if (!state.tokenPool.length) {
+                showToast('Thêm Access Token vào pool trước.', 'error');
+                return;
+            }
 
-        try {
-            await window.api.generateImages(state.scriptId, state.tokenPool);
-            showToast(`Image generation started! (${state.tokenPool.length} tokens × 3 workers)`, 'success');
-            startPolling();
-        } catch (err) {
-            showToast(`Generation failed: ${err.message}`, 'error');
-            state.isGenerating = false;
-            els.btnGenerateAll.disabled = false;
+            state.isGenerating = true;
+            els.btnGenerateAll.disabled = true;
+
+            try {
+                const pacing = parseFloat(els.apPacing ? els.apPacing.value : 10) || 10;
+                const prompts = cards.map(card => {
+                    const ta = card.querySelector('.scene-prompt-textarea, textarea');
+                    return ta ? ta.value.trim() : (card.querySelector('.ap-prompt-text') ? card.querySelector('.ap-prompt-text').textContent.trim() : '');
+                }).filter(p => p);
+
+                await window.api.saveApPrompts(prompts, pacing);
+                await window.api.generateImages(AP_SCRIPT_ID, state.tokenPool);
+                showToast(`Đã bắt đầu gen ${prompts.length} ảnh! (${state.tokenPool.length} tokens)`, 'success');
+                startApPolling();
+            } catch (err) {
+                showToast(`Generation failed: ${err.message}`, 'error');
+                state.isGenerating = false;
+                els.btnGenerateAll.disabled = false;
+            }
+        } else {
+            // Original projects flow
+            if (!state.scenes.length) {
+                showToast('Analyze a script first.', 'error');
+                return;
+            }
+
+            if (!state.tokenPool.length) {
+                showToast('No tokens in pool. Click "Access Token Pool" to add tokens.', 'error');
+                return;
+            }
+
+            state.isGenerating = true;
+            els.btnGenerateAll.disabled = true;
+
+            try {
+                await window.api.generateImages(state.scriptId, state.tokenPool);
+                showToast(`Image generation started! (${state.tokenPool.length} tokens × 3 workers)`, 'success');
+                startPolling();
+            } catch (err) {
+                showToast(`Generation failed: ${err.message}`, 'error');
+                state.isGenerating = false;
+                els.btnGenerateAll.disabled = false;
+            }
         }
     }
 
@@ -693,23 +856,19 @@
 
     // ==================== Gallery ====================
     function renderGallery() {
-        if (!state.images.length) {
-            els.galleryGrid.innerHTML = '';
-            return;
-        }
-
-        // Check if any scenes are still generating
         const generatingScenes = state.scenes.filter(s => s.status === 'generating' || s.status === 'pending');
 
-        let html = state.images.map((img) => `
-            <div class="gallery-item">
-                <img src="${window.api.getImageUrl(img.file_name)}" alt="Scene ${img.scene_number}" loading="lazy">
-                <span class="gallery-scene-tag">Scene ${String(img.scene_number).padStart(2, '0')}</span>
-            </div>
-        `).join('');
+        let html = state.images.map((img) => {
+            const imageSrc = window.api.getImageUrl(img.url || img.file_name);
+            return `
+                <div class="gallery-item">
+                    <img src="${imageSrc}" alt="Scene ${img.scene_number}" loading="lazy">
+                    <span class="gallery-scene-tag">Scene ${String(img.scene_number).padStart(2, '0')}</span>
+                </div>
+            `;
+        }).join('');
 
-        // Add loading placeholders for generating scenes
-        generatingScenes.forEach((scene) => {
+        generatingScenes.forEach(() => {
             html += `
                 <div class="gallery-item gallery-item-loading">
                     <div class="spinner"></div>
@@ -718,20 +877,218 @@
             `;
         });
 
+        if (!html) {
+            els.galleryGrid.innerHTML = '';
+            return;
+        }
+
         els.galleryGrid.innerHTML = html;
     }
 
     // ==================== Grid Size Toggle ====================
     function setGridSize(size) {
         state.gridSize = size;
-        els.btnGridSm.classList.toggle('active', size === 'sm');
-        els.btnGridLg.classList.toggle('active', size === 'lg');
-        els.galleryGrid.classList.toggle('grid-lg', size === 'lg');
+        if (els.btnGridSm) els.btnGridSm.classList.toggle('active', size === 'sm');
+        if (els.btnGridLg) els.btnGridLg.classList.toggle('active', size === 'lg');
+        if (els.galleryGrid) els.galleryGrid.classList.toggle('grid-lg', size === 'lg');
+    }
+
+    // ==================== AP Gallery ====================
+    function startApPolling() {
+        stopApPolling();
+        state.apPollTimer = setInterval(async () => {
+            try {
+                const status = await window.api.getStatus(AP_SCRIPT_ID);
+                state.apImages = status.images || [];
+
+                // Also fetch scene details to detect error messages
+                let apSceneStatuses = [];
+                try {
+                    const scenesData = await window.api.getScenes(AP_SCRIPT_ID);
+                    apSceneStatuses = scenesData.scenes || [];
+                    // Log errors for scenes that just failed
+                    for (const scene of apSceneStatuses) {
+                        const prevStatus = state.prevSceneStatuses[`ap_${scene.id}`];
+                        if (prevStatus && prevStatus !== scene.status) {
+                            if (scene.status === 'success') {
+                                addLogEntry('success', `Prompt ${String(scene.scene_number).padStart(2, '0')}`, 'Image generated successfully');
+                            } else if (scene.status === 'error') {
+                                const errMsg = scene.error_message || 'Unknown error';
+                                addLogEntry('error', `Prompt ${String(scene.scene_number).padStart(2, '0')}`, errMsg);
+                            }
+                        }
+                        state.prevSceneStatuses[`ap_${scene.id}`] = scene.status;
+                    }
+                } catch (_) {}
+
+                state._apSceneStatuses = apSceneStatuses;
+                renderApGallery();
+
+                // Update progress
+                if (status.total > 0) {
+                    const done = status.completed + (status.errors || 0);
+                    const errorSuffix = status.errors > 0 ? ` (${status.errors} lỗi)` : '';
+                    els.progressText.textContent = `${status.completed} / ${status.total} Images Complete${errorSuffix}`;
+                }
+
+                if (status.generating === 0 && status.pending === 0) {
+                    state.isGenerating = false;
+                    if (els.btnGenerateAll) els.btnGenerateAll.disabled = false;
+                    stopApPolling();
+                    renderApGallery(); // Re-render to remove spinners
+
+                    if (status.total === 0) {
+                        showToast('Không tìm thấy scenes. Kiểm tra lại backend.', 'error');
+                    } else if (status.errors > 0 && status.completed === 0) {
+                        showToast(`Tất cả ${status.errors} ảnh bị lỗi. Kiểm tra log.`, 'error');
+                    } else if (status.errors > 0) {
+                        showToast(`Gen xong: ${status.completed} OK, ${status.errors} lỗi.`, 'error');
+                    } else if (status.completed > 0) {
+                        showToast(`Đã gen xong ${status.completed} ảnh!`, 'success');
+                    }
+                }
+            } catch (e) { }
+        }, 1500);
+    }
+
+    function stopApPolling() {
+        if (state.apPollTimer) {
+            clearInterval(state.apPollTimer);
+            state.apPollTimer = null;
+        }
+    }
+
+    function renderApGallery() {
+        if (!els.apGalleryGrid) return;
+
+        const sceneStatuses = state._apSceneStatuses || [];
+        const successImages = state.apImages || [];
+
+        // Build a map: scene_number -> image
+        const imageByScene = {};
+        for (const img of successImages) {
+            imageByScene[img.scene_number] = img;
+        }
+
+        let html = '';
+        let hasErrors = false;
+
+        if (sceneStatuses.length > 0) {
+            for (const scene of sceneStatuses) {
+                const img = imageByScene[scene.scene_number];
+                const label = `Prompt ${String(scene.scene_number).padStart(2, '0')}`;
+                const regenBtn = `<button class="btn-gallery-regen" data-scene-id="${scene.id}" title="Gen lại ảnh này">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                </button>`;
+
+                if (img) {
+                    const imageSrc = window.api.getImageUrl(img.url || img.file_name);
+                    html += `
+                        <div class="gallery-item">
+                            <img src="${imageSrc}" alt="${label}" loading="lazy">
+                            <span class="gallery-scene-tag">${label}</span>
+                            ${regenBtn}
+                        </div>
+                    `;
+                } else if (scene.status === 'error') {
+                    hasErrors = true;
+                    const errMsg = scene.error_message || 'Generation failed';
+                    html += `
+                        <div class="gallery-item gallery-item-error">
+                            <div style="color:#e74c3c;font-size:28px;">✗</div>
+                            <span style="color:#e74c3c;font-size:12px;text-align:center;padding:4px 8px;">
+                                ${label} - Lỗi
+                            </span>
+                            <span style="color:#999;font-size:10px;text-align:center;padding:0 8px;max-height:40px;overflow:hidden;">
+                                ${errMsg.substring(0, 80)}
+                            </span>
+                            ${regenBtn}
+                        </div>
+                    `;
+                } else if (scene.status === 'generating' || scene.status === 'pending') {
+                    html += `
+                        <div class="gallery-item gallery-item-loading">
+                            <div class="spinner"></div>
+                            <span>Generating...</span>
+                        </div>
+                    `;
+                }
+            }
+        } else if (state.isGenerating) {
+            const promptCount = els.apScenesList
+                ? els.apScenesList.querySelectorAll('.scene-card.status-success').length || 1
+                : 1;
+            html = Array.from({ length: promptCount }, () => `
+                <div class="gallery-item gallery-item-loading">
+                    <div class="spinner"></div>
+                    <span>Generating...</span>
+                </div>
+            `).join('');
+        }
+
+        // Show/hide "Gen Lỗi" button based on whether there are errors
+        const btnRetryFailed = document.getElementById('btn-ap-retry-failed-images');
+        if (btnRetryFailed) {
+            btnRetryFailed.style.display = hasErrors ? '' : 'none';
+        }
+
+        if (!html) {
+            els.apGalleryGrid.innerHTML = '<div class="scenes-empty" style="width:100%;padding:32px 0;text-align:center;"><p>Bấm <strong>"Generate All Images"</strong> để tạo ảnh từ các prompts đã gen.</p></div>';
+            return;
+        }
+
+        els.apGalleryGrid.innerHTML = html;
+    }
+
+    // ==================== AP Image Regen ====================
+    async function apRegenSingleImage(sceneId) {
+        if (!state.tokenPool.length) {
+            showToast('Thêm Access Token vào pool trước.', 'error');
+            return;
+        }
+        try {
+            await window.api.regenerate(sceneId, state.tokenPool);
+            showToast('Regenerating...', 'success');
+            if (!state.isGenerating) {
+                state.isGenerating = true;
+                startApPolling();
+            }
+        } catch (err) {
+            showToast(`Regen failed: ${err.message}`, 'error');
+        }
+    }
+
+    async function apRetryFailedImages() {
+        if (!state.tokenPool.length) {
+            showToast('Thêm Access Token vào pool trước.', 'error');
+            return;
+        }
+        if (state.isGenerating) {
+            showToast('Đang gen, vui lòng chờ...', 'error');
+            return;
+        }
+        try {
+            // /generate-images already queues scenes with status 'error'
+            await window.api.generateImages(AP_SCRIPT_ID, state.tokenPool);
+            const errorCount = (state._apSceneStatuses || []).filter(s => s.status === 'error').length;
+            showToast(`Đang gen lại ${errorCount} ảnh lỗi...`, 'success');
+            state.isGenerating = true;
+            if (els.btnGenerateAll) els.btnGenerateAll.disabled = true;
+            startApPolling();
+        } catch (err) {
+            showToast(`Retry failed: ${err.message}`, 'error');
+        }
     }
 
     // ==================== Export ZIP ====================
     async function exportZip() {
-        if (!state.images.length) {
+        const useApScriptId = isApViewActive();
+        const imagesExist = useApScriptId ? state.apImages.length > 0 : state.images.length > 0;
+
+        if (!imagesExist) {
             showToast('No images to export.', 'error');
             return;
         }
@@ -739,10 +1096,11 @@
         els.btnExportZip.disabled = true;
 
         try {
-            const blobUrl = await window.api.exportZip(state.scriptId);
+            const exportScriptId = useApScriptId ? AP_SCRIPT_ID : state.scriptId;
+            const blobUrl = await window.api.exportZip(exportScriptId);
             const a = document.createElement('a');
             a.href = blobUrl;
-            a.download = `ai_studio_export_${state.scriptId}.zip`;
+            a.download = `ai_studio_export_${exportScriptId}.zip`;
             a.click();
             URL.revokeObjectURL(blobUrl);
             showToast('Export complete!', 'success');
@@ -801,8 +1159,8 @@
             const icon = entry.type === 'success'
                 ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="var(--status-success)"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="2" fill="none"/></svg>`
                 : entry.type === 'error'
-                ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
-                : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+                    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+                    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
 
             return `
                 <div class="log-entry log-${entry.type}">
@@ -854,21 +1212,87 @@
     }
 
     // ==================== Auto Prompter ====================
-    async function apGeneratePrompts() {
+
+    /**
+     * Render a single scene card into the output panel at the correct sorted position.
+     */
+    function apRenderSceneCard(index, totalPrompts, pacing, promptText, status = 'success') {
+        const startSec = (index - 1) * pacing;
+        const endSec = startSec + pacing;
+        const tsStart = `${Math.floor(startSec / 60).toString().padStart(2, '0')}:${Math.floor(startSec % 60).toString().padStart(2, '0')}`;
+        const tsEnd = `${Math.floor(endSec / 60).toString().padStart(2, '0')}:${Math.floor(endSec % 60).toString().padStart(2, '0')}`;
+
+        const statusIcon = status === 'success'
+            ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--status-success)"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="2" fill="none"/></svg>`
+            : status === 'generating'
+                ? `<svg class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`
+                : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>`;
+
+        // Remove existing card for this index (if re-rendering)
+        const existingCard = els.apScenesList.querySelector(`[data-prompt-index="${index}"]`);
+        if (existingCard) existingCard.remove();
+
+        const card = document.createElement('div');
+        card.className = `scene-card status-${status}`;
+        card.dataset.promptIndex = index;
+        card.innerHTML = `
+            <div class="scene-card-header">
+                <div class="scene-label">
+                    <span class="scene-number">PROMPT ${String(index).padStart(2, '0')}</span>
+                    <span class="scene-timestamp">${tsStart}–${tsEnd}</span>
+                </div>
+                <div class="scene-card-actions">
+                    <div class="scene-status-icon ${status}">${statusIcon}</div>
+                </div>
+            </div>
+            <div class="scene-prompt-label">IMAGE PROMPT</div>
+            <textarea class="scene-prompt-textarea" data-prompt-index="${index}" ${status === 'generating' ? 'disabled' : ''}>${escapeHtml(promptText)}</textarea>
+        `;
+
+        // Insert in sorted order
+        const allCards = Array.from(els.apScenesList.querySelectorAll('.scene-card'));
+        let inserted = false;
+        for (const existing of allCards) {
+            const existingIdx = parseInt(existing.dataset.promptIndex);
+            if (existingIdx > index) {
+                els.apScenesList.insertBefore(card, existing);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) {
+            els.apScenesList.appendChild(card);
+        }
+
+        // Add Regenerate Prompt button
+        if (status !== 'generating' && status !== 'pending') {
+            const footer = document.createElement('div');
+            footer.className = 'scene-card-footer';
+            footer.innerHTML = `<button class="btn btn-secondary btn-ap-regenerate" style="width: 100%; margin-top: 8px;">Regenerate</button>`;
+            card.appendChild(footer);
+        }
+
+        // Auto-scroll to latest card
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function apGeneratePrompts(mode = 'all', specificIndices = []) {
         if (state.isGenerating) return;
 
-        const apiKey = els.apGeminiKey ? els.apGeminiKey.value.trim() : '';
-        if (!apiKey) {
-            showToast('Please enter your Gemini API key.', 'error');
+        const rawKeys = els.apKeyPool ? els.apKeyPool.value.trim() : '';
+        const apiKeys = rawKeys.split('\n').map(k => k.trim()).filter(k => k.length > 0);
+        if (apiKeys.length === 0) {
+            showToast('Vui lòng nhập ít nhất 1 Gemini API key.', 'error');
             return;
         }
-        state.geminiApiKey = apiKey;
-        if(els.geminiKeyInput) els.geminiKeyInput.value = apiKey;
+
+        state.geminiApiKey = apiKeys[0];
+        if (els.geminiKeyInput) els.geminiKeyInput.value = apiKeys[0];
         saveGeminiKey();
 
         const scriptText = els.apScript ? els.apScript.value.trim() : '';
         if (!scriptText) {
-            showToast('Please enter a script.', 'error');
+            showToast('Vui lòng nhập kịch bản.', 'error');
             return;
         }
 
@@ -877,51 +1301,579 @@
         const totalPrompts = Math.max(1, Math.ceil(dur / pacing));
         const styleText = els.apStyle ? els.apStyle.value.trim() : '';
 
-        els.btnApGenerate.disabled = true;
-        els.btnApGenerate.innerHTML = `Đang xử lý...`;
-        
+        // Determine queue based on mode
+        const queue = [];
+        if (mode === 'all') {
+            for (let i = 1; i <= totalPrompts; i++) queue.push(i);
+            if (els.apScenesList) els.apScenesList.innerHTML = '';
+        } else if (mode === 'failed') {
+            const errorCards = Array.from(els.apScenesList.querySelectorAll('.scene-card.status-error'));
+            if (errorCards.length === 0) {
+                showToast('Không có prompt nào bị lỗi.', 'info');
+                return;
+            }
+            errorCards.forEach(card => queue.push(parseInt(card.dataset.promptIndex)));
+        } else if (mode === 'single') {
+            queue.push(...specificIndices);
+        }
+
+        state.isGenerating = true;
+        state.apStopRequested = false;
+
+        const WORKERS_PER_KEY = 1;
+        const totalWorkers = apiKeys.length * WORKERS_PER_KEY;
+        els.btnApGenerate.style.display = 'none';
+
+        if (els.btnApStop) {
+            els.btnApStop.disabled = false;
+        }
+
+        if (els.btnApRetryAll) els.btnApRetryAll.disabled = true;
+        if (els.btnApRetryFailed) els.btnApRetryFailed.disabled = true;
+
         els.apProgressContainer.style.display = 'block';
         els.apProgressBar.style.width = '0%';
         els.apProgressBar.style.backgroundColor = 'var(--status-success)';
         els.apProgressPct.textContent = '0%';
-        els.apProgressText.textContent = `0 / ${totalPrompts} prompts`;
-        
-        els.apOutput.value += `\n--- Bắt đầu phiên tạo mới (${totalPrompts} prompts) ---\n\n`;
 
-        state.isGenerating = true;
+        const queueSize = queue.length;
+        els.apProgressText.textContent = `0 / ${queueSize} prompts (${apiKeys.length} key × ${WORKERS_PER_KEY} luồng)`;
+
+        if (els.apEmptyMsg) els.apEmptyMsg.style.display = 'none';
+
+        let completedCount = 0;
+        let errorCount = 0;
+
+        // Create placeholders for new gens
+        if (mode === 'all') {
+            for (let i = 1; i <= totalPrompts; i++) {
+                apRenderSceneCard(i, totalPrompts, pacing, 'Đang chờ...', 'pending');
+            }
+        }
+
+        async function worker(apiKey, workerIdx) {
+            while (queue.length > 0) {
+                if (state.apStopRequested) break;
+
+                const promptIndex = queue.shift();
+                if (promptIndex === undefined) break;
+
+                apRenderSceneCard(promptIndex, totalPrompts, pacing, `Đang tạo (key ${workerIdx + 1})...`, 'generating');
+
+                try {
+                    const response = await window.api.generateAudioPrompt(
+                        scriptText, promptIndex, totalPrompts, styleText, apiKey
+                    );
+                    if (state.apStopRequested) break;
+                    apRenderSceneCard(promptIndex, totalPrompts, pacing, response.prompt, 'success');
+                    completedCount++;
+                } catch (err) {
+                    if (state.apStopRequested) break;
+                    try {
+                        await new Promise(r => setTimeout(r, 2000));
+                        const response = await window.api.generateAudioPrompt(
+                            scriptText, promptIndex, totalPrompts, styleText, apiKey
+                        );
+                        if (state.apStopRequested) break;
+                        apRenderSceneCard(promptIndex, totalPrompts, pacing, response.prompt, 'success');
+                        completedCount++;
+                    } catch (retryErr) {
+                        apRenderSceneCard(promptIndex, totalPrompts, pacing, `Lỗi: ${retryErr.message}`, 'error');
+                        errorCount++;
+                    }
+                }
+
+                if (!state.apStopRequested) {
+                    const done = completedCount + errorCount;
+                    const pct = Math.round((done / queueSize) * 100);
+                    els.apProgressBar.style.width = `${pct}%`;
+                    els.apProgressPct.textContent = `${pct}%`;
+                    els.apProgressText.textContent = `${done} / ${queueSize} prompts (${apiKeys.length} key × ${WORKERS_PER_KEY} luồng)`;
+
+                    if (queue.length > 0) {
+                        await new Promise(r => setTimeout(r, TIMEOUTS_BETWEEN_REQUESTS));
+                    }
+                }
+            }
+        }
 
         try {
-            for (let i = 1; i <= totalPrompts; i++) {
-                els.apProgressText.textContent = `Đang tạo prompt ${i}/${totalPrompts}...`;
-                
-                const response = await window.api.generateAudioPrompt(
-                    scriptText, i, totalPrompts, styleText, apiKey
-                );
-                
-                els.apOutput.value += `PROMPT ${i}:\n${response.prompt}\n\n`;
-                els.apOutput.scrollTop = els.apOutput.scrollHeight;
-                
-                const pct = Math.round((i / totalPrompts) * 100);
-                els.apProgressBar.style.width = `${pct}%`;
-                els.apProgressPct.textContent = `${pct}%`;
+            const allWorkers = [];
+            let workerIdx = 0;
+            for (const key of apiKeys) {
+                for (let w = 0; w < WORKERS_PER_KEY; w++) {
+                    allWorkers.push(worker(key, workerIdx++));
+                }
             }
-            
-            showToast('Đã hoàn thành tạo chuỗi prompts!', 'success');
-            els.apProgressText.textContent = 'Hoàn thành!';
+            await Promise.all(allWorkers);
+
+            if (state.apStopRequested) {
+                showToast(`Đã ngừng! Xong ${completedCount}, Lỗi ${errorCount}.`, 'warning');
+                els.apProgressText.textContent = 'Đã ngừng bởi người dùng';
+            } else if (errorCount === 0) {
+                showToast(`Hoàn thành! Đã tạo ${completedCount} prompts.`, 'success');
+                els.apProgressText.textContent = 'Hoàn thành!';
+            } else {
+                showToast(`Xong: ${completedCount} thành công, ${errorCount} lỗi.`, 'error');
+                els.apProgressText.textContent = `${completedCount} OK, ${errorCount} lỗi`;
+                els.apProgressBar.style.backgroundColor = 'var(--status-error)';
+            }
         } catch (err) {
             showToast(`Generating failed: ${err.message}`, 'error');
             els.apProgressText.textContent = 'Lỗi!';
             els.apProgressBar.style.backgroundColor = 'var(--status-error)';
         } finally {
             state.isGenerating = false;
-            els.btnApGenerate.disabled = false;
-            els.btnApGenerate.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            state.apStopRequested = false;
+
+            // Restore buttons
+            if (els.btnApStop) els.btnApStop.disabled = true;
+            if (els.btnApGenerate) els.btnApGenerate.style.display = 'flex';
+            if (els.btnApRetryAll) els.btnApRetryAll.disabled = false;
+            if (els.btnApRetryFailed) els.btnApRetryFailed.disabled = false;
+        }
+    }
+
+    // ==================== Video Render ====================
+
+    /**
+     * Scan the input folder for images and render the file list.
+     */
+    async function vrScanFolder() {
+        const inputDir = els.vrInputDir ? els.vrInputDir.value.trim() : '';
+        if (!inputDir) {
+            showToast('Nhập đường dẫn thư mục ảnh trước.', 'error');
+            return;
+        }
+
+        if (els.btnVrScan) {
+            els.btnVrScan.disabled = true;
+            els.btnVrScan.innerHTML = `
+                <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                 </svg>
-                Tạo Visual Prompts
+                Đang quét...
             `;
         }
+
+        try {
+            const data = await window.api.videoScan(inputDir);
+            state.vrScannedFiles = data.images || [];
+
+            // Show scan info
+            if (els.vrScanInfo) {
+                els.vrScanInfo.style.display = 'block';
+                els.vrScanInfo.textContent = `Tìm thấy ${data.total} ảnh trong thư mục`;
+            }
+
+            // Render file list
+            vrRenderFileList();
+
+            // Enable render button
+            if (els.btnVrRender) els.btnVrRender.disabled = state.vrScannedFiles.length === 0;
+
+            showToast(`Quét xong: ${data.total} ảnh.`, 'success');
+        } catch (err) {
+            showToast(`Quét thất bại: ${err.message}`, 'error');
+            state.vrScannedFiles = [];
+            if (els.vrScanInfo) {
+                els.vrScanInfo.style.display = 'block';
+                els.vrScanInfo.textContent = `Lỗi: ${err.message}`;
+                els.vrScanInfo.style.color = 'var(--status-error)';
+            }
+        } finally {
+            if (els.btnVrScan) {
+                els.btnVrScan.disabled = false;
+                els.btnVrScan.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    Quét Thư Mục
+                `;
+            }
+        }
+    }
+
+    /**
+     * Render the scanned file list in the right panel.
+     */
+    function vrRenderFileList() {
+        if (!els.vrFileList) return;
+
+        const files = state.vrScannedFiles;
+
+        // Update count
+        if (els.vrFileCount) {
+            els.vrFileCount.textContent = files.length > 0 ? `${files.length} files` : '';
+        }
+
+        if (files.length === 0) {
+            els.vrFileList.innerHTML = `
+                <div class="scenes-empty" id="vr-empty-msg">
+                    <p>Không tìm thấy ảnh nào (jpg, png, webp).</p>
+                </div>
+            `;
+            return;
+        }
+
+        els.vrFileList.innerHTML = files.map((f, i) => {
+            const ext = f.name.split('.').pop().toUpperCase();
+            return `
+                <div class="vr-file-item" data-index="${i}" data-path="${escapeAttr(f.path)}">
+                    <div class="vr-file-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </div>
+                    <div class="vr-file-info">
+                        <span class="vr-file-name">${escapeHtml(f.name)}</span>
+                        <span class="vr-file-meta">${ext} · ${f.size_kb} KB</span>
+                    </div>
+                    <div class="vr-file-status" id="vr-fstatus-${i}">
+                        <span class="vr-file-badge pending">Chờ</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Start batch video rendering.
+     */
+    async function vrStartRender() {
+        if (state.vrRendering) {
+            showToast('Đang render, vui lòng chờ...', 'error');
+            return;
+        }
+        if (state.vrScannedFiles.length === 0) {
+            showToast('Quét thư mục trước khi render.', 'error');
+            return;
+        }
+
+        const inputDir = els.vrInputDir ? els.vrInputDir.value.trim() : '';
+        const outputDir = els.vrOutputDir ? els.vrOutputDir.value.trim() : '';
+        const duration = parseInt(els.vrDuration ? els.vrDuration.value : '8') || 8;
+        const maxWorkers = parseInt(els.vrWorkers ? els.vrWorkers.value : '4') || 4;
+
+        if (!inputDir) {
+            showToast('Nhập đường dẫn thư mục ảnh.', 'error');
+            return;
+        }
+
+        // Disable button, show progress
+        if (els.btnVrRender) {
+            els.btnVrRender.disabled = true;
+            els.btnVrRender.innerHTML = `
+                <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                Đang Render...
+            `;
+        }
+        if (els.btnVrScan) els.btnVrScan.disabled = true;
+
+        if (els.vrProgressContainer) els.vrProgressContainer.style.display = 'block';
+        if (els.vrProgressBar) els.vrProgressBar.style.width = '0%';
+        if (els.vrProgressPct) els.vrProgressPct.textContent = '0%';
+        if (els.vrProgressText) els.vrProgressText.textContent = 'Đang chuẩn bị...';
+
+        try {
+            const data = await window.api.videoRender(inputDir, outputDir, duration, maxWorkers);
+            state.vrRendering = true;
+            state.vrOutputDir = data.output_dir || '';
+            showToast(`Bắt đầu render ${data.total} video...`, 'success');
+            if (els.vrProgressText) els.vrProgressText.textContent = `0 / ${data.total} videos`;
+
+            // Start polling
+            vrStartPolling();
+        } catch (err) {
+            showToast(`Render thất bại: ${err.message}`, 'error');
+            vrResetButtons();
+        }
+    }
+
+    /**
+     * Poll video render status every 1.5s.
+     */
+    function vrStartPolling() {
+        vrStopPolling();
+        state.vrPollTimer = setInterval(async () => {
+            try {
+                const status = await window.api.videoStatus();
+
+                // Update progress bar
+                const total = status.total || 0;
+                const done = (status.completed || 0) + (status.errors || 0);
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                if (els.vrProgressBar) els.vrProgressBar.style.width = `${pct}%`;
+                if (els.vrProgressPct) els.vrProgressPct.textContent = `${pct}%`;
+                if (els.vrProgressText) {
+                    const errSuffix = status.errors > 0 ? ` (${status.errors} lỗi)` : '';
+                    els.vrProgressText.textContent = `${status.completed} / ${total} videos${errSuffix}`;
+                }
+
+                // Update file list badges with live status
+                if (status.results && status.results.length > 0) {
+                    vrUpdateFileStatuses(status.results);
+                }
+
+                // Check if finished
+                if (!status.running) {
+                    state.vrRendering = false;
+                    vrStopPolling();
+                    vrResetButtons();
+
+                    // Render results grid
+                    vrRenderResults(status.results || []);
+
+                    // Show retry button if errors
+                    if (els.btnVrRetryFailed) {
+                        els.btnVrRetryFailed.style.display = (status.errors || 0) > 0 ? '' : 'none';
+                    }
+
+                    // Progress bar color
+                    if (els.vrProgressBar) {
+                        els.vrProgressBar.style.background = status.errors > 0
+                            ? 'var(--status-error)' : 'var(--status-success)';
+                    }
+
+                    if (status.errors > 0 && status.completed > 0) {
+                        showToast(`Xong: ${status.completed} OK, ${status.errors} lỗi.`, 'error');
+                        if (els.vrProgressText) els.vrProgressText.textContent = `${status.completed} OK, ${status.errors} lỗi`;
+                    } else if (status.errors > 0 && status.completed === 0) {
+                        showToast(`Tất cả ${status.errors} video bị lỗi!`, 'error');
+                        if (els.vrProgressText) els.vrProgressText.textContent = `Tất cả lỗi!`;
+                    } else {
+                        showToast(`Hoàn thành! Đã render ${status.completed} video.`, 'success');
+                        if (els.vrProgressText) els.vrProgressText.textContent = 'Hoàn thành!';
+                    }
+                }
+            } catch (e) {
+                // Silently continue
+            }
+        }, 1500);
+    }
+
+    function vrStopPolling() {
+        if (state.vrPollTimer) {
+            clearInterval(state.vrPollTimer);
+            state.vrPollTimer = null;
+        }
+    }
+
+    /**
+     * Update file list badges based on render results.
+     */
+    function vrUpdateFileStatuses(results) {
+        if (!els.vrFileList) return;
+        const resultMap = {};
+        for (const r of results) {
+            resultMap[r.image_name] = r.status;
+        }
+
+        state.vrScannedFiles.forEach((f, i) => {
+            const statusEl = document.getElementById(`vr-fstatus-${i}`);
+            if (!statusEl) return;
+
+            const st = resultMap[f.name];
+            if (st === 'success') {
+                statusEl.innerHTML = '<span class="vr-file-badge success">✓ OK</span>';
+            } else if (st === 'error') {
+                statusEl.innerHTML = '<span class="vr-file-badge error">✗ Lỗi</span>';
+            } else if (st === 'rendering') {
+                statusEl.innerHTML = '<span class="vr-file-badge rendering">⟳ Render</span>';
+            }
+        });
+    }
+
+    /**
+     * Render the results gallery after batch render is done.
+     */
+    function vrRenderResults(results) {
+        if (!els.vrResultGrid) return;
+
+        if (!results || results.length === 0) {
+            els.vrResultGrid.innerHTML = `
+                <div class="scenes-empty" style="width:100%;padding:32px 0;text-align:center;">
+                    <p>Kết quả render sẽ hiển thị ở đây.</p>
+                </div>
+            `;
+            return;
+        }
+
+        els.vrResultGrid.innerHTML = results.map((r) => {
+            const reRenderBtn = `<button class="btn-vr-rerender" data-image-path="${escapeAttr(r.image_name)}" title="Render lại">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>`;
+
+            if (r.status === 'success') {
+                return `
+                    <div class="gallery-item vr-result-item vr-result-success">
+                        <div class="vr-result-icon success">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-success)" stroke-width="2">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                        </div>
+                        <span class="vr-result-name" title="${escapeAttr(r.video_name)}">${escapeHtml(r.video_name)}</span>
+                        <span class="vr-result-status success">✓ Thành công</span>
+                        ${reRenderBtn}
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="gallery-item vr-result-item vr-result-error">
+                        <div class="vr-result-icon error">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                        </div>
+                        <span class="vr-result-name" title="${escapeAttr(r.image_name)}">${escapeHtml(r.image_name)}</span>
+                        <span class="vr-result-status error">✗ Lỗi</span>
+                        <span class="vr-result-error-msg" title="${escapeAttr(r.error_message || '')}">${escapeHtml((r.error_message || '').substring(0, 60))}</span>
+                        ${reRenderBtn}
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+
+    /**
+     * Render a single image to video (re-render).
+     */
+    async function vrRenderSingle(imageName) {
+        const inputDir = els.vrInputDir ? els.vrInputDir.value.trim() : '';
+        const outputDir = els.vrOutputDir ? els.vrOutputDir.value.trim() : state.vrOutputDir;
+        const duration = parseInt(els.vrDuration ? els.vrDuration.value : '8') || 8;
+
+        // Resolve full image path from scanned files
+        const file = state.vrScannedFiles.find(f => f.name === imageName);
+        const imagePath = file ? file.path : (inputDir ? inputDir + '\\' + imageName : imageName);
+
+        showToast(`Đang render lại: ${imageName}...`, 'info');
+
+        try {
+            const result = await window.api.videoRenderSingle(imagePath, outputDir, duration);
+
+            if (result.status === 'success') {
+                showToast(`Render lại thành công: ${result.video_name}`, 'success');
+            } else {
+                showToast(`Render lại thất bại: ${result.error_message}`, 'error');
+            }
+
+            // Refresh status to update the results grid
+            try {
+                const status = await window.api.videoStatus();
+                if (status.results && status.results.length > 0) {
+                    // Update the single item in results
+                    const idx = status.results.findIndex(r => r.image_name === imageName);
+                    if (idx >= 0) {
+                        status.results[idx] = {
+                            image_name: result.image_name,
+                            video_name: result.video_name,
+                            status: result.status,
+                            error_message: result.error_message || '',
+                        };
+                    }
+                    vrRenderResults(status.results);
+                    vrUpdateFileStatuses(status.results);
+                }
+            } catch (_) {}
+        } catch (err) {
+            showToast(`Render lỗi: ${err.message}`, 'error');
+        }
+    }
+
+    /**
+     * Retry rendering only the failed videos.
+     */
+    async function vrRetryFailed() {
+        if (state.vrRendering) {
+            showToast('Đang render, vui lòng chờ...', 'error');
+            return;
+        }
+
+        try {
+            const status = await window.api.videoStatus();
+            const failedResults = (status.results || []).filter(r => r.status === 'error');
+
+            if (failedResults.length === 0) {
+                showToast('Không có video lỗi nào.', 'info');
+                return;
+            }
+
+            showToast(`Đang render lại ${failedResults.length} video lỗi...`, 'info');
+
+            const inputDir = els.vrInputDir ? els.vrInputDir.value.trim() : '';
+            const outputDir = els.vrOutputDir ? els.vrOutputDir.value.trim() : state.vrOutputDir;
+            const duration = parseInt(els.vrDuration ? els.vrDuration.value : '8') || 8;
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const failed of failedResults) {
+                const file = state.vrScannedFiles.find(f => f.name === failed.image_name);
+                const imagePath = file ? file.path : (inputDir ? inputDir + '\\' + failed.image_name : failed.image_name);
+
+                try {
+                    const result = await window.api.videoRenderSingle(imagePath, outputDir, duration);
+                    if (result.status === 'success') {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                } catch (e) {
+                    errorCount++;
+                }
+            }
+
+            // Refresh results display
+            try {
+                const finalStatus = await window.api.videoStatus();
+                if (finalStatus.results && finalStatus.results.length > 0) {
+                    vrRenderResults(finalStatus.results);
+                    vrUpdateFileStatuses(finalStatus.results);
+                }
+            } catch (_) {}
+
+            if (errorCount === 0) {
+                showToast(`Retry thành công! ${successCount} video OK.`, 'success');
+            } else {
+                showToast(`Retry xong: ${successCount} OK, ${errorCount} vẫn lỗi.`, 'error');
+            }
+
+            // Hide retry button if no more errors
+            if (els.btnVrRetryFailed) {
+                els.btnVrRetryFailed.style.display = errorCount > 0 ? '' : 'none';
+            }
+        } catch (err) {
+            showToast(`Retry thất bại: ${err.message}`, 'error');
+        }
+    }
+
+    /**
+     * Reset VR buttons to idle state.
+     */
+    function vrResetButtons() {
+        if (els.btnVrRender) {
+            els.btnVrRender.disabled = state.vrScannedFiles.length === 0;
+            els.btnVrRender.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"/>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+                Bắt Đầu Render Video
+            `;
+        }
+        if (els.btnVrScan) els.btnVrScan.disabled = false;
     }
 
     // ==================== Start ====================

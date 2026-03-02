@@ -83,3 +83,23 @@ class ExportResponse(BaseModel):
     file_path: str
     file_name: str
     total_images: int
+
+
+class SaveApPromptsRequest(BaseModel):
+    prompts: list[str] = Field(..., description="List of AP-generated prompt strings")
+    pacing: float = Field(default=10.0, description="Seconds per prompt (for timestamp calculation)")
+
+
+# ---------- Video Render ----------
+
+class VideoRenderRequest(BaseModel):
+    input_dir: str = Field(..., min_length=1, description="Path to folder containing images")
+    output_dir: str = Field(default="", description="Path for output videos (default: input_dir/clips)")
+    duration: int = Field(default=8, ge=1, le=60, description="Duration of each video in seconds")
+    max_workers: int = Field(default=4, ge=1, le=16, description="Number of parallel FFmpeg workers")
+
+
+class VideoRenderSingleRequest(BaseModel):
+    image_path: str = Field(..., min_length=1, description="Absolute path to a single image")
+    output_dir: str = Field(default="", description="Path for output video")
+    duration: int = Field(default=8, ge=1, le=60, description="Duration in seconds")

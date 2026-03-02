@@ -3,6 +3,7 @@ dist/
 out/
 release/
 build/
+.history/
 
 # Python
 backend/__pycache__/

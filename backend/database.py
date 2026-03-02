@@ -81,6 +81,8 @@ async def init_db():
         -- Seed a default project if none exists
         INSERT OR IGNORE INTO projects (id, name) VALUES (1, 'Sci-Fi Story');
         INSERT OR IGNORE INTO scripts (id, project_id, title) VALUES (1, 1, 'Untitled Script');
+        -- Seed script_id=2 reserved for Auto Prompter
+        INSERT OR IGNORE INTO scripts (id, project_id, title) VALUES (2, 1, 'Auto Prompter');
     """)
 
     await db.commit()
@@ -92,6 +94,15 @@ async def init_db():
         print("[DB] Migration: added 'error_message' column to scenes table")
     except Exception:
         # Column already exists — ignore
+        pass
+
+    # --- Ensure script_id=2 (Auto Prompter) exists ---
+    try:
+        await db.execute(
+            "INSERT OR IGNORE INTO scripts (id, project_id, title) VALUES (2, 1, 'Auto Prompter')"
+        )
+        await db.commit()
+    except Exception:
         pass
 
 

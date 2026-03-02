@@ -181,7 +181,6 @@ class ImageGenerationQueue:
                 await db.update_scene_error(scene_id, err_msg)
             finally:
                 self._queue.task_done()
-
     async def _generate_with_whisk(self, prompt: str, scene_number: int, token: str) -> tuple[str, str, int, int]:
         """
         Call the Google Whisk API to generate an image.
@@ -189,6 +188,11 @@ class ImageGenerationQueue:
         """
         cfg = get_config()
 
+        token_str = token if isinstance(token, str) else ""
+        print(
+            f"[Whisk] Scene {scene_number}: preparing request | prompt_len={len(str(prompt).strip())} | "
+            f"token_present={'yes' if bool(token_str) else 'no'} | token_len={len(token_str)}"
+        )
         headers = {
             "Authorization": f"Bearer {token}",
             "Referer": "https://labs.google/",
@@ -215,17 +219,30 @@ class ImageGenerationQueue:
             "mediaCategory": "MEDIA_CATEGORY_BOARD"
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                self.WHISK_API_URL,
-                headers=headers,
-                content=json.dumps(payload),
-            )
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    self.WHISK_API_URL,
+                    headers=headers,
+                    data=json.dumps(payload),
+                )
+        except Exception as e:
+            print(f"[Whisk] Scene {scene_number}: request exception: {type(e).__name__}: {e}")
+            raise
+
+        print(
+            f"[Whisk] Scene {scene_number}: response status={response.status_code} | "
+            f"content_type={response.headers.get('content-type', '')}"
+        )
 
         if response.status_code != 200:
-            raise Exception(f"Whisk API failed ({response.status_code}): {response.text[:500]}")
+            body_preview = response.text[:500]
+            print(f"[Whisk] Scene {scene_number}: error body: {body_preview}")
+            raise Exception(f"Whisk API failed ({response.status_code}): {body_preview}")
 
         data = response.json()
+        response_keys = list(data.keys())
+        print(f"[Whisk] Scene {scene_number}: response key count={len(response_keys)}")
 
         # Parse the response: extract the first generated image
         image_panels = data.get("imagePanels", [])
